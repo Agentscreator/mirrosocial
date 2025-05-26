@@ -230,15 +230,35 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
   )
 }
 
-export default function SingleConversationPage() {
-  const params = useParams()
+// NextJS 15 compatible page component - this is the fix!
+interface PageProps {
+  params: Promise<{ userId: string }>
+}
+
+export default function SingleConversationPage({ params }: PageProps) {
   const router = useRouter()
-  const userId = params.userId as string
+  const [userId, setUserId] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [channel, setChannel] = useState<StreamChannel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { client, isReady, error: streamError } = useStreamContext()
+
+  // Handle async params in NextJS 15
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const resolvedParams = await params
+        setUserId(resolvedParams.userId)
+      } catch (error) {
+        console.error('Failed to resolve params:', error)
+        setError('Failed to load page parameters')
+        setLoading(false)
+      }
+    }
+
+    resolveParams()
+  }, [params])
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -387,9 +407,12 @@ export default function SingleConversationPage() {
       }
     }
 
-    // Add a small delay to ensure router is ready
-    const timer = setTimeout(initializeChat, 100)
-    return () => clearTimeout(timer)
+    // Only initialize chat when userId is available
+    if (userId) {
+      // Add a small delay to ensure everything is ready
+      const timer = setTimeout(initializeChat, 100)
+      return () => clearTimeout(timer)
+    }
   }, [client, isReady, userId, streamError])
 
   if (loading) {
