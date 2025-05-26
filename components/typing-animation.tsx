@@ -19,90 +19,49 @@ export function TypingAnimation({ dots = 3, speed = 500 }: TypingAnimationProps)
   }, [dots, speed])
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 z-50">
+    <div className="inline-flex items-center gap-4 px-8 py-4 bg-gradient-to-r from-sky-50/80 to-sky-100/80 backdrop-blur-xl rounded-2xl border border-sky-200/30 shadow-lg shadow-sky-100/50">
+      {/* Futuristic thinking icon */}
       <div className="relative">
-        {/* Main content */}
-        <div className="relative z-10 text-center">
-          {/* Thinking text with shimmer effect */}
-          <div className="mb-8">
-            <h2 className="text-6xl font-light text-sky-900/80 tracking-wide mb-4 relative overflow-hidden">
-              <span className="relative inline-block">
-                Thinking
-                {Array(count)
-                  .fill(".")
-                  .map((dot, i) => (
-                    <span
-                      key={i}
-                      className="inline-block ml-1 text-sky-500"
-                      style={{
-                        opacity: 1,
-                      }}
-                    >
-                      {dot}
-                    </span>
-                  ))}
-                {/* Shimmer overlay */}
-                <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-              </span>
-            </h2>
+        <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-sky-500 rounded-full flex items-center justify-center shadow-lg shadow-sky-200/50">
+          <div className="w-4 h-4 bg-white/90 rounded-full flex items-center justify-center">
+            <div className="w-2 h-2 bg-sky-500 rounded-full animate-pulse"></div>
           </div>
+        </div>
+        {/* Orbital rings */}
+        <div
+          className="absolute inset-0 border-2 border-sky-300/30 rounded-full animate-spin"
+          style={{ animationDuration: "3s" }}
+        ></div>
+        <div
+          className="absolute inset-1 border border-sky-400/20 rounded-full animate-spin"
+          style={{ animationDuration: "2s", animationDirection: "reverse" }}
+        ></div>
+      </div>
 
-          {/* Central element with shimmer */}
-          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-sky-100/60 to-sky-200/60 rounded-full flex items-center justify-center backdrop-blur-sm border border-sky-200/30 shadow-xl shadow-sky-100/50 relative overflow-hidden">
-            <div className="w-20 h-20 bg-gradient-to-br from-sky-200/40 to-sky-300/40 rounded-full flex items-center justify-center relative overflow-hidden">
-              <div className="w-3 h-3 bg-sky-400 rounded-full"></div>
+      {/* Enhanced text */}
+      <div className="flex items-center gap-2">
+        <span className="text-2xl font-light text-sky-900 tracking-wide">Thinking</span>
 
-              {/* Shimmer effect on the circle */}
-              <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer-slow"></div>
-            </div>
-
-            {/* Outer shimmer */}
-            <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer-slower"></div>
-          </div>
+        {/* Modern dot animation */}
+        <div className="flex items-center gap-1">
+          {Array.from({ length: dots }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                i < count
+                  ? "bg-gradient-to-r from-sky-400 to-sky-500 shadow-lg shadow-sky-200/50 scale-110"
+                  : "bg-sky-200/50 scale-75"
+              }`}
+              style={{
+                animationDelay: `${i * 150}ms`,
+              }}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Custom shimmer animations */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%) skewX(-12deg);
-          }
-          100% {
-            transform: translateX(200%) skewX(-12deg);
-          }
-        }
-
-        @keyframes shimmer-slow {
-          0% {
-            transform: translateX(-100%) skewX(-12deg);
-          }
-          100% {
-            transform: translateX(200%) skewX(-12deg);
-          }
-        }
-
-        @keyframes shimmer-slower {
-          0% {
-            transform: translateX(-100%) skewX(-12deg);
-          }
-          100% {
-            transform: translateX(200%) skewX(-12deg);
-          }
-        }
-
-        .animate-shimmer {
-          animation: shimmer 2s ease-in-out infinite;
-        }
-
-        .animate-shimmer-slow {
-          animation: shimmer-slow 3s ease-in-out infinite;
-        }
-
-        .animate-shimmer-slower {
-          animation: shimmer-slower 4s ease-in-out infinite;
-        }
-      `}</style>
+      {/* Subtle glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-sky-100/20 to-sky-200/20 rounded-2xl blur-xl -z-10"></div>
     </div>
   )
 }
