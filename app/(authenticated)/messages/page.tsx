@@ -287,25 +287,56 @@ const CustomMessageInput = () => {
 
 // Empty State Component
 const EmptyState = () => (
-  <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
-    <div className="text-center max-w-md">
-      <div className="relative mb-8">
-        <div className="w-32 h-32 bg-gradient-to-br from-sky-100 to-sky-200 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-sky-100/50">
-          <MessageSquarePlus className="h-16 w-16 text-sky-500" />
+  <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 relative overflow-hidden">
+    {/* Floating geometric shapes */}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-sky-200/20 to-sky-300/20 rounded-full blur-xl animate-pulse"></div>
+      <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-gradient-to-br from-sky-300/20 to-sky-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
+      <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-gradient-to-br from-sky-100/30 to-sky-200/30 rounded-full blur-lg animate-pulse delay-500"></div>
+    </div>
+
+    {/* Main content */}
+    <div className="text-center max-w-md relative z-10">
+      <div className="relative mb-12">
+        {/* Main icon container */}
+        <div className="w-40 h-40 bg-gradient-to-br from-sky-100/80 to-sky-200/80 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-sky-100/50 border border-sky-200/30">
+          <div className="w-32 h-32 bg-gradient-to-br from-sky-200/60 to-sky-300/60 rounded-full flex items-center justify-center">
+            <MessageSquarePlus className="h-20 w-20 text-sky-500/80" />
+          </div>
         </div>
-        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-sky-400 to-sky-500 rounded-full flex items-center justify-center shadow-lg">
-          <Sparkles className="h-4 w-4 text-white" />
+
+        {/* Floating accent elements */}
+        <div className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-sky-400/80 to-sky-500/80 rounded-full flex items-center justify-center shadow-xl shadow-sky-200/50 animate-bounce">
+          <Sparkles className="h-6 w-6 text-white" />
+        </div>
+
+        {/* Orbiting elements */}
+        <div className="absolute top-8 -left-8 w-6 h-6 bg-gradient-to-r from-sky-300/60 to-sky-400/60 rounded-full animate-pulse"></div>
+        <div className="absolute bottom-8 -right-8 w-4 h-4 bg-gradient-to-r from-sky-200/60 to-sky-300/60 rounded-full animate-pulse delay-700"></div>
+      </div>
+
+      {/* Minimal, elegant text */}
+      <div className="space-y-6">
+        <h3 className="text-3xl font-light text-sky-900/80 tracking-wide">Your conversations await</h3>
+
+        {/* Subtle call to action */}
+        <div className="pt-4">
+          <Button className="bg-gradient-to-r from-sky-400/90 to-sky-500/90 hover:from-sky-500 hover:to-sky-600 text-white shadow-xl shadow-sky-200/40 hover:shadow-2xl hover:shadow-sky-300/50 transition-all duration-500 hover:scale-105 px-10 py-4 rounded-full border border-sky-300/20 backdrop-blur-sm">
+            <Plus className="h-5 w-5 mr-3" />
+            <span className="font-medium">Begin</span>
+          </Button>
         </div>
       </div>
-      <h3 className="text-2xl font-bold text-sky-900 mb-3">Welcome to Messages</h3>
-      <p className="text-sky-600 mb-8 leading-relaxed">
-        Select a conversation to start chatting, or create a new conversation to connect with someone special.
-      </p>
-      <Button className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white shadow-lg shadow-sky-200/50 hover:shadow-xl hover:shadow-sky-300/50 transition-all duration-300 hover:scale-105 px-8 py-3 rounded-full">
-        <Plus className="h-5 w-5 mr-2" />
-        Start New Chat
-      </Button>
     </div>
+
+    {/* Subtle grid pattern overlay */}
+    <div
+      className="absolute inset-0 opacity-[0.02]"
+      style={{
+        backgroundImage: `radial-gradient(circle at 1px 1px, rgb(14 165 233) 1px, transparent 0)`,
+        backgroundSize: "24px 24px",
+      }}
+    ></div>
   </div>
 )
 
