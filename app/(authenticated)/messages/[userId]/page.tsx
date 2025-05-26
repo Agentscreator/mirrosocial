@@ -166,37 +166,75 @@ export default function SingleConversationPage() {
         }
 
         const userData = await userResponse.json()
-        console.log('User data received:', userData)
+        console.log('User data received:', JSON.stringify(userData, null, 2))
 
         // Handle different possible response structures
         let userInfo: User | null = null
 
-        if (userData.user) {
-          // Structure: { user: { id, username, ... } }
-          userInfo = {
-            id: userData.user.id?.toString() || userData.user._id?.toString(),
-            username: userData.user.username,
-            nickname: userData.user.nickname,
-            image: userData.user.image || userData.user.profileImage,
+        // Try to extract user data from various possible structures
+        const extractUserData = (data: any): User | null => {
+          // Direct user object
+          if (data.user) {
+            const user = data.user
+            return {
+              id: user.id?.toString() || user._id?.toString() || user.userId?.toString(),
+              username: user.username || user.name || user.displayName,
+              nickname: user.nickname || user.displayName || user.fullName,
+              image: user.image || user.profileImage || user.avatar || user.photo,
+            }
           }
-        } else if (userData.id || userData._id) {
-          // Structure: { id, username, ... }
-          userInfo = {
-            id: userData.id?.toString() || userData._id?.toString(),
-            username: userData.username,
-            nickname: userData.nickname,
-            image: userData.image || userData.profileImage,
+          
+          // Direct data structure
+          if (data.id || data._id || data.userId) {
+            return {
+              id: data.id?.toString() || data._id?.toString() || data.userId?.toString(),
+              username: data.username || data.name || data.displayName,
+              nickname: data.nickname || data.displayName || data.fullName,
+              image: data.image || data.profileImage || data.avatar || data.photo,
+            }
           }
-        } else {
-          console.error('Unexpected user data structure:', userData)
-          throw new Error("Invalid user data structure")
+
+          // Array response - take first item
+          if (Array.isArray(data) && data.length > 0) {
+            return extractUserData(data[0])
+          }
+
+          // Nested data structure
+          if (data.data) {
+            return extractUserData(data.data)
+          }
+
+          // Success wrapper
+          if (data.success && data.user) {
+            return extractUserData(data.user)
+          }
+
+          return null
         }
 
-        // Validate required fields
-        if (!userInfo.id || !userInfo.username) {
-          console.error('Missing required user fields:', userInfo)
-          throw new Error("Invalid user data: missing required fields")
+        userInfo = extractUserData(userData)
+
+        if (!userInfo) {
+          console.error('Could not extract user data from response:', userData)
+          console.error('Available keys:', Object.keys(userData))
+          throw new Error(`Invalid user data structure. Available keys: ${Object.keys(userData).join(', ')}`)
         }
+
+        // Validate required fields - be more flexible with username
+        if (!userInfo.id || (!userInfo.username && !userInfo.nickname)) {
+          console.error('Missing required user fields:', userInfo)
+          console.error('userInfo.id:', userInfo.id)
+          console.error('userInfo.username:', userInfo.username)
+          console.error('userInfo.nickname:', userInfo.nickname)
+          throw new Error(`Invalid user data: missing required fields. ID: ${userInfo.id}, Username: ${userInfo.username}, Nickname: ${userInfo.nickname}`)
+        }
+
+        // Ensure we have a displayable name
+        if (!userInfo.username && userInfo.nickname) {
+          userInfo.username = userInfo.nickname
+        }
+
+        console.log('Final user info:', userInfo)
 
         setUser(userInfo)
 
