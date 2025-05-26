@@ -146,37 +146,87 @@ export default function SingleConversationPage() {
         setLoading(true)
         setError(null)
 
+        // Validate userId format
+        if (!userId || userId === 'undefined' || userId === 'null') {
+          setError("Invalid user ID")
+          return
+        }
+
+        console.log('Fetching user data for userId:', userId)
+
         // Fetch user information first
         const userResponse = await fetch(`/api/users/${userId}`)
         if (!userResponse.ok) {
+          console.error('User fetch failed:', userResponse.status, userResponse.statusText)
           if (userResponse.status === 404) {
             setError("User not found")
             return
           }
-          throw new Error("Failed to fetch user data")
+          throw new Error(`Failed to fetch user data: ${userResponse.status}`)
         }
 
         const userData = await userResponse.json()
-        setUser({
-          id: userData.user.id,
-          username: userData.user.username,
-          nickname: userData.user.nickname,
-          image: userData.user.image || userData.user.profileImage,
-        })
+        console.log('User data received:', userData)
+
+        // Handle different possible response structures
+        let userInfo: User | null = null
+
+        if (userData.user) {
+          // Structure: { user: { id, username, ... } }
+          userInfo = {
+            id: userData.user.id?.toString() || userData.user._id?.toString(),
+            username: userData.user.username,
+            nickname: userData.user.nickname,
+            image: userData.user.image || userData.user.profileImage,
+          }
+        } else if (userData.id || userData._id) {
+          // Structure: { id, username, ... }
+          userInfo = {
+            id: userData.id?.toString() || userData._id?.toString(),
+            username: userData.username,
+            nickname: userData.nickname,
+            image: userData.image || userData.profileImage,
+          }
+        } else {
+          console.error('Unexpected user data structure:', userData)
+          throw new Error("Invalid user data structure")
+        }
+
+        // Validate required fields
+        if (!userInfo.id || !userInfo.username) {
+          console.error('Missing required user fields:', userInfo)
+          throw new Error("Invalid user data: missing required fields")
+        }
+
+        setUser(userInfo)
+
+        console.log('Creating channel for user:', userInfo.id)
 
         // Create or get existing channel via API
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientId: userId }),
+          body: JSON.stringify({ recipientId: userInfo.id }),
         })
 
         if (!channelResponse.ok) {
-          const errorData = await channelResponse.json()
+          const errorText = await channelResponse.text()
+          let errorData
+          try {
+            errorData = JSON.parse(errorText)
+          } catch {
+            errorData = { error: errorText }
+          }
+          console.error('Channel creation failed:', errorData)
           throw new Error(errorData.error || "Failed to create channel")
         }
 
-        const { channelId } = await channelResponse.json()
+        const channelData = await channelResponse.json()
+        console.log('Channel data received:', channelData)
+
+        if (!channelData.channelId) {
+          throw new Error("No channel ID received")
+        }
 
         // Connect to the channel with retry logic
         let retries = 3
@@ -184,8 +234,9 @@ export default function SingleConversationPage() {
 
         while (retries > 0 && !streamChannel) {
           try {
-            streamChannel = client.channel("messaging", channelId)
+            streamChannel = client.channel("messaging", channelData.channelId)
             await streamChannel.watch()
+            console.log('Channel connected successfully:', channelData.channelId)
             break
           } catch (channelError) {
             console.warn(`Channel watch attempt failed, retries left: ${retries - 1}`, channelError)
@@ -200,13 +251,16 @@ export default function SingleConversationPage() {
         setChannel(streamChannel)
       } catch (err) {
         console.error("Chat initialization error:", err)
-        setError(err instanceof Error ? err.message : "Failed to load conversation")
+        const errorMessage = err instanceof Error ? err.message : "Failed to load conversation"
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
     }
 
-    initializeChat()
+    // Add a small delay to ensure router is ready
+    const timer = setTimeout(initializeChat, 100)
+    return () => clearTimeout(timer)
   }, [client, isReady, userId, streamError])
 
   if (loading) {
@@ -223,19 +277,29 @@ export default function SingleConversationPage() {
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <h2 className="text-xl font-semibold text-red-600 mb-2">{error}</h2>
           <p className="text-gray-600 mb-4">
             {error === "User not found"
               ? "This user doesn't exist or has been removed."
-              : "Unable to load this conversation."}
+              : error === "Invalid user ID"
+              ? "The user ID provided is not valid."
+              : "Unable to load this conversation. Please try again."}
           </p>
-          <Button
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => router.push("/messages")}
-          >
-            Back to Messages
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => router.push("/messages")}
+            >
+              Back to Messages
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -269,7 +333,7 @@ export default function SingleConversationPage() {
           <Avatar className="h-10 w-10">
             <AvatarImage src={user.image} />
             <AvatarFallback className="bg-blue-500 text-white">
-              {user.username[0]?.toUpperCase() || "?"}
+              {user.username?.[0]?.toUpperCase() || "?"}
             </AvatarFallback>
           </Avatar>
           
@@ -335,127 +399,127 @@ export default function SingleConversationPage() {
         </Channel>
       </div>
 
-      {/* Custom Styles */}
-      <style jsx global>{`
-        .str-chat__main-panel {
-          height: 100%;
-          background: #f8fafc;
-        }
-        
-        .str-chat__message-list {
-          padding: 1rem;
-          background: #f8fafc;
-        }
-        
-        .str-chat__message-list-scroll {
-          height: 100%;
-        }
-        
-        .str-chat__message-simple {
-          margin-bottom: 0.75rem;
-        }
-        
-        .str-chat__message-simple__content {
-          background: white;
-          border: none;
-          border-radius: 1.125rem;
-          padding: 0.75rem 1rem;
-          box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-          max-width: 70%;
-        }
-        
-        .str-chat__message-simple--me .str-chat__message-simple__content {
-          background: #3b82f6;
-          color: white;
-        }
-        
-        .str-chat__message-simple__text {
-          font-size: 0.875rem;
-          line-height: 1.25rem;
-          margin: 0;
-        }
-        
-        .str-chat__avatar {
-          width: 2rem;
-          height: 2rem;
-          margin-right: 0.5rem;
-        }
-        
-        .str-chat__message-simple__actions {
-          display: none;
-        }
-        
-        .str-chat__message-simple:hover .str-chat__message-simple__actions {
-          display: flex;
-        }
-        
-        .str-chat__message-timestamp {
-          font-size: 0.75rem;
-          color: #6b7280;
-          margin-top: 0.25rem;
-        }
-        
-        .str-chat__message-simple__status {
-          margin-top: 0.25rem;
-        }
-        
-        .str-chat__message-simple__status svg {
-          width: 0.875rem;
-          height: 0.875rem;
-          color: #3b82f6;
-        }
-        
-        .str-chat__thread {
-          border-left: 1px solid #e5e7eb;
-          background: white;
-        }
-        
-        /* Ensure proper scrolling */
-        .str-chat__message-list-scroll {
-          scroll-behavior: smooth;
-        }
-        
-        /* Custom scrollbar */
-        .str-chat__message-list-scroll::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        .str-chat__message-list-scroll::-webkit-scrollbar-track {
-          background: #f1f5f9;
-        }
-        
-        .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 3px;
-        }
-        
-        .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
-        
-        /* Animation for new messages */
-        @keyframes slideInUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .str-chat__message-simple {
-          animation: slideInUp 0.2s ease-out;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-          .str-chat__message-simple__content {
-            max-width: 85%;
-          }
-        }
-      `}</style>
+      {/* Custom Styles - Using dangerouslySetInnerHTML for global styles */}
+      <style 
+        dangerouslySetInnerHTML={{
+          __html: `
+            .str-chat__main-panel {
+              height: 100%;
+              background: #f8fafc;
+            }
+            
+            .str-chat__message-list {
+              padding: 1rem;
+              background: #f8fafc;
+            }
+            
+            .str-chat__message-list-scroll {
+              height: 100%;
+            }
+            
+            .str-chat__message-simple {
+              margin-bottom: 0.75rem;
+            }
+            
+            .str-chat__message-simple__content {
+              background: white;
+              border: none;
+              border-radius: 1.125rem;
+              padding: 0.75rem 1rem;
+              box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+              max-width: 70%;
+            }
+            
+            .str-chat__message-simple--me .str-chat__message-simple__content {
+              background: #3b82f6;
+              color: white;
+            }
+            
+            .str-chat__message-simple__text {
+              font-size: 0.875rem;
+              line-height: 1.25rem;
+              margin: 0;
+            }
+            
+            .str-chat__avatar {
+              width: 2rem;
+              height: 2rem;
+              margin-right: 0.5rem;
+            }
+            
+            .str-chat__message-simple__actions {
+              display: none;
+            }
+            
+            .str-chat__message-simple:hover .str-chat__message-simple__actions {
+              display: flex;
+            }
+            
+            .str-chat__message-timestamp {
+              font-size: 0.75rem;
+              color: #6b7280;
+              margin-top: 0.25rem;
+            }
+            
+            .str-chat__message-simple__status {
+              margin-top: 0.25rem;
+            }
+            
+            .str-chat__message-simple__status svg {
+              width: 0.875rem;
+              height: 0.875rem;
+              color: #3b82f6;
+            }
+            
+            .str-chat__thread {
+              border-left: 1px solid #e5e7eb;
+              background: white;
+            }
+            
+            .str-chat__message-list-scroll {
+              scroll-behavior: smooth;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar {
+              width: 6px;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-track {
+              background: #f1f5f9;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
+              background: #cbd5e1;
+              border-radius: 3px;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
+              background: #94a3b8;
+            }
+            
+            @keyframes slideInUp {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            
+            .str-chat__message-simple {
+              animation: slideInUp 0.2s ease-out;
+            }
+            
+            @media (max-width: 768px) {
+              .str-chat__message-simple__content {
+                max-width: 85%;
+              }
+            }
+          `
+        }}
+      />
     </div>
   )
 }
