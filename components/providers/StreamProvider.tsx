@@ -1,164 +1,154 @@
-"use client"
+// components/providers/StreamProvider.tsx
+'use client'
 
-import type React from "react"
+import { StreamChat } from 'stream-chat'
+import { Chat, useChatContext } from 'stream-chat-react'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState, createContext, useContext } from 'react'
 
-import { createContext, useContext, useEffect, useState, useRef } from "react"
-import { StreamChat } from "stream-chat"
-import type { User } from "stream-chat"
-import { useSession } from "next-auth/react"
-
-interface StreamContextType {
+// Create a context for additional Stream functionality
+const StreamContext = createContext<{
   client: StreamChat | null
-  isReady: boolean
+  isLoading: boolean
   error: string | null
-  user: User | null
-}
-
-const StreamContext = createContext<StreamContextType>({
+  isReady: boolean
+}>({
   client: null,
-  isReady: false,
+  isLoading: true,
   error: null,
-  user: null,
+  isReady: false
 })
 
+// Export the hook for components to use
 export const useStreamContext = () => {
   const context = useContext(StreamContext)
   if (!context) {
-    throw new Error("useStreamContext must be used within StreamProvider")
+    throw new Error('useStreamContext must be used within a StreamProvider')
   }
   return context
 }
 
-interface StreamProviderProps {
-  children: React.ReactNode
-}
+// Also export the chat context hook for convenience
+export { useChatContext }
 
-export function StreamProvider({ children }: StreamProviderProps) {
+let chatClient: StreamChat | null = null
+
+export function StreamProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const [client, setClient] = useState<StreamChat | null>(null)
-  const [isReady, setIsReady] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<User | null>(null)
-  const initializingRef = useRef(false)
-  const clientRef = useRef<StreamChat | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    const initializeStream = async () => {
-      // Wait for session to be loaded
-      if (status === "loading") {
-        return
-      }
+    if (status === 'loading') return
+    
+    if (!session?.user?.id) {
+      setIsLoading(false)
+      return
+    }
 
-      // If no session, clear everything
-      if (!session?.user?.id) {
-        if (clientRef.current) {
-          try {
-            await clientRef.current.disconnectUser()
-          } catch (err) {
-            console.warn("Error disconnecting client:", err)
-          }
-          clientRef.current = null
-        }
-        setClient(null)
-        setIsReady(false)
-        setUser(null)
-        setError(null)
-        return
-      }
-
-      // Prevent multiple initializations
-      if (initializingRef.current) {
-        return
-      }
-
-      // If client already exists and is connected to the same user, don't reinitialize
-      if (clientRef.current?.userID === session.user.id && isReady) {
-        return
-      }
-
+    const initializeClient = async () => {
       try {
-        initializingRef.current = true
         setError(null)
-        setIsReady(false)
-
-        // Disconnect existing client if any
-        if (clientRef.current) {
-          try {
-            await clientRef.current.disconnectUser()
-          } catch (err) {
-            console.warn("Error disconnecting previous client:", err)
-          }
-          clientRef.current = null
+        
+        if (!process.env.NEXT_PUBLIC_STREAM_API_KEY) {
+          throw new Error('Stream API key is not configured')
         }
 
-        // Create new client instance
-        const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
-        if (!apiKey) {
-          throw new Error("Stream API key not found")
+        // Create client if it doesn't exist
+        if (!chatClient) {
+          chatClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY)
         }
 
-        const streamClient = StreamChat.getInstance(apiKey)
+        // Check if user is already connected
+        if (chatClient.userID === session.user.id) {
+          setClient(chatClient)
+        setIsReady(true)
+          setIsLoading(false)
+          return
+        }
 
-        // Get token from API
-        const tokenResponse = await fetch("/api/stream/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        // Get token from your API
+        const tokenResponse = await fetch('/api/stream/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
         })
 
         if (!tokenResponse.ok) {
-          throw new Error("Failed to get Stream token")
+          throw new Error('Failed to get Stream token')
         }
 
         const { token } = await tokenResponse.json()
 
-        // Prepare user data
-        const streamUser: User = {
-          id: session.user.id,
-          name: session.user.name || session.user.email || session.user.id,
-          image: session.user.image || undefined,
-        }
-
         // Connect user
-        await streamClient.connectUser(streamUser, token)
+        await chatClient.connectUser(
+          {
+            id: session.user.id,
+            name: session.user.name || 'Unknown User',
+            image: session.user.image || undefined, // Convert null to undefined
+          },
+          token
+        )
 
-        clientRef.current = streamClient
-        setClient(streamClient)
-        setUser(streamUser)
-        setIsReady(true)
+        setClient(chatClient)
       } catch (err) {
-        console.error("Stream initialization error:", err)
-        setError(err instanceof Error ? err.message : "Failed to initialize chat")
+        console.error('Stream client initialization error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to initialize chat')
+        setIsReady(false)
       } finally {
-        initializingRef.current = false
+        setIsLoading(false)
       }
     }
 
-    initializeStream()
+    initializeClient()
 
-    // Cleanup function
+    // Cleanup on unmount
     return () => {
-      if (clientRef.current && !initializingRef.current) {
-        clientRef.current.disconnectUser().catch(console.warn)
-        clientRef.current = null
+      if (chatClient?.userID) {
+        chatClient.disconnectUser()
+          .catch(err => console.error('Error disconnecting user:', err))
       }
     }
-  }, [session, status, isReady])
+  }, [session, status])
 
-  // Handle component unmount
-  useEffect(() => {
-    return () => {
-      if (clientRef.current) {
-        clientRef.current.disconnectUser().catch(console.warn)
-      }
-    }
-  }, [])
-
-  const contextValue: StreamContextType = {
-    client,
-    isReady,
-    error,
-    user,
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
-  return <StreamContext.Provider value={contextValue}>{children}</StreamContext.Provider>
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-red-600">
+          <p>Chat initialization failed: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session?.user?.id || !client) {
+    return (
+      <StreamContext.Provider value={{ client: null, isLoading: false, error: null, isReady: false }}>
+        {children}
+      </StreamContext.Provider>
+    )
+  }
+
+  return (
+    <StreamContext.Provider value={{ client, isLoading, error, isReady }}>
+      <Chat client={client} theme="messaging light">
+        {children}
+      </Chat>
+    </StreamContext.Provider>
+  )
 }
