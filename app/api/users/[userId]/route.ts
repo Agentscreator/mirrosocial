@@ -1,9 +1,9 @@
-// app/api/users/[userId]/route.ts
+// app/api/users/[userId]/route.ts - Fixed to return single user profile
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
 import { db } from '@/src/db';
-import { followersTable, usersTable } from '@/src/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { usersTable, followersTable } from '@/src/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
@@ -17,53 +17,69 @@ export async function GET(
 
     // Await params in Next.js 15
     const { userId } = await params;
-    const following = await getFollowing(userId, session.user.id);
     
-    return NextResponse.json({ users: following });
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+    }
+
+    // Get user profile
+    const user = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        nickname: usersTable.nickname,
+        profileImage: usersTable.profileImage,
+        image: usersTable.image,
+        about: usersTable.about,
+        metro_area: usersTable.metro_area,
+        created_at: usersTable.created_at,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (user.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const userProfile = user[0];
+
+    // Check if current user is following this user
+    let isFollowing = false;
+    if (session.user.id !== userId) {
+      const followingCheck = await db
+        .select()
+        .from(followersTable)
+        .where(
+          and(
+            eq(followersTable.followerId, session.user.id),
+            eq(followersTable.followingId, userId)
+          )
+        )
+        .limit(1);
+      
+      isFollowing = followingCheck.length > 0;
+    }
+
+    // Return consistent format that your frontend expects
+    return NextResponse.json({
+      id: userProfile.id,
+      username: userProfile.username,
+      nickname: userProfile.nickname,
+      image: userProfile.profileImage || userProfile.image,
+      profileImage: userProfile.profileImage,
+      about: userProfile.about,
+      metro_area: userProfile.metro_area,
+      created_at: userProfile.created_at,
+      isFollowing,
+      success: true
+    });
+
   } catch (error) {
-    console.error('Error fetching following:', error);
+    console.error('Error fetching user profile:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch following' },
+      { error: 'Failed to fetch user profile' },
       { status: 500 }
     );
   }
-}
-
-async function getFollowing(userId: string, currentUserId: string) {
-  // Get all users that this user is following
-  const followingQuery = await db
-    .select({
-      id: usersTable.id,
-      username: usersTable.username,
-      nickname: usersTable.nickname,
-      profileImage: usersTable.profileImage,
-      image: usersTable.image,
-      metro_area: usersTable.metro_area,
-    })
-    .from(followersTable)
-    .innerJoin(usersTable, eq(followersTable.followingId, usersTable.id))
-    .where(eq(followersTable.followerId, userId));
-
-  if (followingQuery.length === 0) {
-    return [];
-  }
-
-  // Get who the current user is following among these users
-  const followingIds = followingQuery.map(f => f.id);
-  const currentUserFollowing = await db
-    .select({ followingId: followersTable.followingId })
-    .from(followersTable)
-    .where(
-      and(
-        eq(followersTable.followerId, currentUserId),
-        inArray(followersTable.followingId, followingIds)
-      )
-    );
-
-  const followingSet = new Set(currentUserFollowing.map(f => f.followingId));
-
-  return followingQuery.map(following => ({
-    ...following,
-    isFollowing: followingSet.has(following.id)
-  }));
 }

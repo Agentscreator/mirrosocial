@@ -44,118 +44,68 @@ interface User {
   nickname?: string
   image?: string
   profileImage?: string
+  about?: string
+  metro_area?: string
+  created_at?: string
+  isFollowing?: boolean
 }
 
-// Enhanced user data extraction function - FIXED VERSION
-const extractUserData = (data: any): User | null => {
-  console.log('Extracting user data from:', JSON.stringify(data, null, 2))
- 
-  // Helper function to safely extract string values
-  const safeString = (value: any): string | undefined => {
-    if (value === null || value === undefined) return undefined
-    return String(value).trim() || undefined
+interface ApiResponse {
+  success?: boolean
+  error?: string
+  id?: string
+  username?: string
+  nickname?: string
+  image?: string
+  profileImage?: string
+  about?: string
+  metro_area?: string
+  created_at?: string
+  isFollowing?: boolean
+}
+
+// Improved user data extraction function that matches your API response format
+const extractUserData = (data: ApiResponse): User | null => {
+  console.log('Extracting user data from API response:', JSON.stringify(data, null, 2))
+  
+  // Check if the response indicates an error
+  if (data.error) {
+    console.error('API returned error:', data.error)
+    throw new Error(data.error)
   }
 
-  // Helper function to get ID as string
-  const getId = (obj: any): string | undefined => {
-    const id = obj.id || obj._id || obj.userId || obj.user_id
-    return id ? String(id) : undefined
+  // Check if response indicates success but has no data
+  if (data.success === false) {
+    console.error('API request was not successful')
+    throw new Error('User data request failed')
   }
 
-  // Helper function to get username/display name
-  const getUsername = (obj: any): string | undefined => {
-    return safeString(obj.username) ||
-           safeString(obj.name) ||
-           safeString(obj.displayName) ||
-           safeString(obj.display_name) ||
-           safeString(obj.handle)
+  // Validate required fields based on your API response structure
+  if (!data.id) {
+    console.error('No user ID found in response:', data)
+    throw new Error('Invalid user data: missing ID')
   }
 
-  // Helper function to get nickname/full name
-  const getNickname = (obj: any): string | undefined => {
-    return safeString(obj.nickname) ||
-           safeString(obj.fullName) ||
-           safeString(obj.full_name) ||
-           safeString(obj.displayName) ||
-           safeString(obj.display_name) ||
-           safeString(obj.firstName && obj.lastName ? `${obj.firstName} ${obj.lastName}` : null) ||
-           safeString(obj.first_name && obj.last_name ? `${obj.first_name} ${obj.last_name}` : null)
+  if (!data.username) {
+    console.error('No username found in response:', data)
+    throw new Error('Invalid user data: missing username')
   }
 
-  // Helper function to get image URL
-  const getImage = (obj: any): string | undefined => {
-    return safeString(obj.image) ||
-           safeString(obj.profileImage) ||
-           safeString(obj.profile_image) ||
-           safeString(obj.avatar) ||
-           safeString(obj.avatarUrl) ||
-           safeString(obj.avatar_url) ||
-           safeString(obj.photo) ||
-           safeString(obj.picture)
-  }
-
-  // Try different data structures - FIXED TO HANDLE { users: [...] }
-  let candidate = null
-
-  // 1. Check for 'users' array property FIRST (this is your API format)
-  if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
-    candidate = data.users[0]
-    console.log('Found user in users array:', candidate)
-  }
-  // 2. Direct user object in 'user' property
-  else if (data?.user && typeof data.user === 'object') {
-    candidate = data.user
-  }
-  // 3. Direct user object in 'data' property  
-  else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-    candidate = data.data
-  }
-  // 4. Array in 'data' property - take first item
-  else if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
-    candidate = data.data[0]
-  }
-  // 5. Direct array - take first item
-  else if (Array.isArray(data) && data.length > 0) {
-    candidate = data[0]
-  }
-  // 6. Direct object (root level)
-  else if (data && typeof data === 'object') {
-    candidate = data
-  }
-
-  if (!candidate) {
-    console.error('No valid candidate found in data structure')
-    return null
-  }
-
-  // Extract fields from candidate
-  const id = getId(candidate)
-  const username = getUsername(candidate)
-  const nickname = getNickname(candidate)
-  const image = getImage(candidate)
-
-  console.log('Extracted fields:', { id, username, nickname, image })
-
-  // Validate required fields
-  if (!id) {
-    console.error('No valid ID found in candidate:', candidate)
-    return null
-  }
-
-  if (!username && !nickname) {
-    console.error('No valid username or nickname found in candidate:', candidate)
-    return null
-  }
-
-  // Build user object
+  // Build user object from the API response
   const user: User = {
-    id,
-    username: username || nickname || `user_${id}`,
-    nickname,
-    image
+    id: data.id,
+    username: data.username,
+    nickname: data.nickname || undefined,
+    // Use profileImage first, then fall back to image (matching your API logic)
+    image: data.profileImage || data.image || undefined,
+    profileImage: data.profileImage || undefined,
+    about: data.about || undefined,
+    metro_area: data.metro_area || undefined,
+    created_at: data.created_at || undefined,
+    isFollowing: data.isFollowing || false
   }
 
-  console.log('Final extracted user:', user)
+  console.log('Successfully extracted user:', user)
   return user
 }
 
@@ -235,7 +185,7 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
   )
 }
 
-// NextJS 15 compatible page component - this is the fix!
+// NextJS 15 compatible page component
 interface PageProps {
   params: Promise<{ userId: string }>
 }
@@ -254,10 +204,16 @@ export default function SingleConversationPage({ params }: PageProps) {
     const resolveParams = async () => {
       try {
         const resolvedParams = await params
+        console.log('Resolved params:', resolvedParams)
+        
+        if (!resolvedParams.userId || resolvedParams.userId === 'undefined' || resolvedParams.userId === 'null') {
+          throw new Error('Invalid user ID in URL parameters')
+        }
+        
         setUserId(resolvedParams.userId)
       } catch (error) {
         console.error('Failed to resolve params:', error)
-        setError('Failed to load page parameters')
+        setError('Invalid URL parameters')
         setLoading(false)
       }
     }
@@ -265,11 +221,60 @@ export default function SingleConversationPage({ params }: PageProps) {
     resolveParams()
   }, [params])
 
+  // Fetch user data function
+  const fetchUserData = async (targetUserId: string): Promise<User> => {
+    console.log('Fetching user data for ID:', targetUserId)
+    
+    // Try the primary endpoint first (matches your fixed API)
+    const response = await fetch(`/api/users/${targetUserId}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      // Handle specific HTTP status codes
+      switch (response.status) {
+        case 401:
+          throw new Error('You need to be logged in to view this conversation')
+        case 404:
+          throw new Error('User not found')
+        case 403:
+          throw new Error('You do not have permission to view this user')
+        case 500:
+          throw new Error('Server error occurred while fetching user data')
+        default:
+          throw new Error(`Failed to fetch user data (Status: ${response.status})`)
+      }
+    }
+
+    let userData: ApiResponse
+    try {
+      userData = await response.json()
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError)
+      throw new Error('Invalid response format from server')
+    }
+
+    console.log('Received user data:', userData)
+    
+    // Extract and validate user data
+    const user = extractUserData(userData)
+    if (!user) {
+      throw new Error('Failed to process user data')
+    }
+
+    return user
+  }
+
   useEffect(() => {
     const initializeChat = async () => {
-      if (!client || !isReady || !userId || streamError) {
+      if (!client || !isReady || !userId) {
         if (streamError) {
-          setError("Chat service unavailable")
+          setError("Chat service is currently unavailable")
         }
         setLoading(false)
         return
@@ -279,72 +284,16 @@ export default function SingleConversationPage({ params }: PageProps) {
         setLoading(true)
         setError(null)
 
-        // Validate userId format
-        if (!userId || userId === 'undefined' || userId === 'null' || userId.trim() === '') {
-          setError("Invalid user ID")
-          return
-        }
-
         console.log('Initializing chat for userId:', userId)
 
-        // Fetch user information with multiple endpoint attempts
-        let userData = null
-        let userResponse = null
-       
-        // Try different API endpoints that might exist
-        const endpoints = [
-          `/api/users/${userId}`,
-          `/api/user/${userId}`,
-          `/api/users/profile/${userId}`,
-          `/api/profile/${userId}`
-        ]
-
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`Trying endpoint: ${endpoint}`)
-            userResponse = await fetch(endpoint, {
-              method: 'GET',
-              credentials: 'include',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              }
-            })
-           
-            if (userResponse.ok) {
-              userData = await userResponse.json()
-              console.log(`Successfully fetched from ${endpoint}:`, userData)
-              break
-            } else {
-              console.warn(`Endpoint ${endpoint} failed with status:`, userResponse.status)
-            }
-          } catch (endpointError) {
-            console.warn(`Endpoint ${endpoint} threw error:`, endpointError)
-            continue
-          }
-        }
-
-        if (!userData || !userResponse?.ok) {
-          console.error('All user fetch attempts failed')
-          setError("User not found")
-          return
-        }
-
-        // Extract user information using robust extraction
-        const userInfo = extractUserData(userData)
-
-        if (!userInfo) {
-          console.error('Failed to extract user data from:', userData)
-          setError("Invalid user data received")
-          return
-        }
-
-        console.log('Successfully extracted user info:', userInfo)
+        // Fetch user information
+        const userInfo = await fetchUserData(userId)
+        console.log('Successfully fetched user info:', userInfo)
         setUser(userInfo)
 
         // Create or get existing channel via API
         console.log('Creating/getting channel for user:', userInfo.id)
-       
+        
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
           headers: {
@@ -356,15 +305,16 @@ export default function SingleConversationPage({ params }: PageProps) {
         })
 
         if (!channelResponse.ok) {
-          const errorText = await channelResponse.text()
-          let errorData
+          let errorMessage = `Failed to create channel (Status: ${channelResponse.status})`
+          
           try {
-            errorData = JSON.parse(errorText)
+            const errorData = await channelResponse.json()
+            errorMessage = errorData.error || errorMessage
           } catch {
-            errorData = { error: errorText }
+            // If we can't parse the error response, use the default message
           }
-          console.error('Channel creation failed:', errorData)
-          throw new Error(errorData.error || `Failed to create channel (${channelResponse.status})`)
+          
+          throw new Error(errorMessage)
         }
 
         const channelData = await channelResponse.json()
@@ -389,7 +339,7 @@ export default function SingleConversationPage({ params }: PageProps) {
             console.warn(`Channel connection attempt failed:`, channelError)
             retries--
             if (retries === 0) {
-              throw new Error(`Failed to connect to channel after multiple attempts: ${channelError instanceof Error ? channelError.message : 'Unknown error'}`)
+              throw new Error(`Failed to connect to channel: ${channelError instanceof Error ? channelError.message : 'Unknown error'}`)
             }
             // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -414,12 +364,11 @@ export default function SingleConversationPage({ params }: PageProps) {
 
     // Only initialize chat when userId is available
     if (userId) {
-      // Add a small delay to ensure everything is ready
-      const timer = setTimeout(initializeChat, 100)
-      return () => clearTimeout(timer)
+      initializeChat()
     }
   }, [client, isReady, userId, streamError])
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -431,6 +380,7 @@ export default function SingleConversationPage({ params }: PageProps) {
     )
   }
 
+  // Error state
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -456,6 +406,7 @@ export default function SingleConversationPage({ params }: PageProps) {
     )
   }
 
+  // Not ready state
   if (!channel || !user || !client || !isReady) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -484,7 +435,7 @@ export default function SingleConversationPage({ params }: PageProps) {
           <Avatar className="h-10 w-10">
             <AvatarImage src={user.image} />
             <AvatarFallback className="bg-blue-500 text-white">
-              {user.username?.[0]?.toUpperCase() || "?"}
+              {user.username?.[0]?.toUpperCase() || user.nickname?.[0]?.toUpperCase() || "?"}
             </AvatarFallback>
           </Avatar>
          
@@ -492,6 +443,9 @@ export default function SingleConversationPage({ params }: PageProps) {
             <h3 className="font-semibold text-gray-900">
               {user.nickname || user.username}
             </h3>
+            {user.metro_area && (
+              <p className="text-xs text-gray-500">{user.metro_area}</p>
+            )}
             <p className="text-sm text-green-500">Online</p>
           </div>
         </div>
