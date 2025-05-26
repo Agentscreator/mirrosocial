@@ -1,16 +1,12 @@
-// app/(authenticated)/messages/[userId]/page.tsx
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   ArrowLeft,
   Phone,
@@ -23,17 +19,9 @@ import {
   Pin,
   Paperclip,
   Smile,
-  Send
+  Send,
 } from "lucide-react"
-import {
-  Channel,
-  MessageInput,
-  MessageList,
-  Thread,
-  Window,
-  MessageInputProps,
-  useChatContext
-} from "stream-chat-react"
+import { Channel, MessageList, Thread, Window, type MessageInputProps, useChatContext } from "stream-chat-react"
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
@@ -66,29 +54,29 @@ interface ApiResponse {
 
 // Improved user data extraction function that matches your API response format
 const extractUserData = (data: ApiResponse): User | null => {
-  console.log('Extracting user data from API response:', JSON.stringify(data, null, 2))
-  
+  console.log("Extracting user data from API response:", JSON.stringify(data, null, 2))
+
   // Check if the response indicates an error
   if (data.error) {
-    console.error('API returned error:', data.error)
+    console.error("API returned error:", data.error)
     throw new Error(data.error)
   }
 
   // Check if response indicates success but has no data
   if (data.success === false) {
-    console.error('API request was not successful')
-    throw new Error('User data request failed')
+    console.error("API request was not successful")
+    throw new Error("User data request failed")
   }
 
   // Validate required fields based on your API response structure
   if (!data.id) {
-    console.error('No user ID found in response:', data)
-    throw new Error('Invalid user data: missing ID')
+    console.error("No user ID found in response:", data)
+    throw new Error("Invalid user data: missing ID")
   }
 
   if (!data.username) {
-    console.error('No username found in response:', data)
-    throw new Error('Invalid user data: missing username')
+    console.error("No username found in response:", data)
+    throw new Error("Invalid user data: missing username")
   }
 
   // Build user object from the API response
@@ -102,16 +90,16 @@ const extractUserData = (data: ApiResponse): User | null => {
     about: data.about || undefined,
     metro_area: data.metro_area || undefined,
     created_at: data.created_at || undefined,
-    isFollowing: data.isFollowing || false
+    isFollowing: data.isFollowing || false,
   }
 
-  console.log('Successfully extracted user:', user)
+  console.log("Successfully extracted user:", user)
   return user
 }
 
 // Custom Message Input Component
 const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
-  const [text, setText] = useState('')
+  const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { channel } = useChatContext()
 
@@ -123,14 +111,14 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
       await channel.sendMessage({
         text: text.trim(),
       })
-      setText('')
+      setText("")
     } catch (error) {
-      console.error('Failed to send message:', error)
+      console.error("Failed to send message:", error)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
     }
@@ -139,8 +127,8 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current
     if (textarea) {
-      textarea.style.height = 'auto'
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+      textarea.style.height = "auto"
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px"
     }
   }
 
@@ -149,39 +137,46 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
   }, [text])
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-3 p-4 border-t bg-white/80 backdrop-blur-sm">
-      <Button type="button" variant="ghost" size="sm" className="p-2 mb-1 hover:bg-gray-100">
-        <Paperclip className="h-5 w-5 text-gray-500" />
-      </Button>
-     
-      <div className="flex-1 relative">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          className="w-full resize-none border border-gray-200 rounded-3xl px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent max-h-[120px] bg-white"
-          rows={1}
-        />
+    <div className="p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-4">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100"
+          className="p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
         >
-          <Smile className="h-4 w-4 text-gray-500" />
+          <Paperclip className="h-5 w-5" />
         </Button>
-      </div>
-     
-      <Button
-        type="submit"
-        disabled={!text.trim()}
-        className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full mb-1 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Send className="h-4 w-4" />
-      </Button>
-    </form>
+
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
+            rows={1}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-sky-100 text-sky-500 rounded-full transition-all duration-200"
+          >
+            <Smile className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={!text.trim()}
+          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105"
+        >
+          <Send className="h-5 w-5" />
+        </Button>
+      </form>
+    </div>
   )
 }
 
@@ -204,16 +199,16 @@ export default function SingleConversationPage({ params }: PageProps) {
     const resolveParams = async () => {
       try {
         const resolvedParams = await params
-        console.log('Resolved params:', resolvedParams)
-        
-        if (!resolvedParams.userId || resolvedParams.userId === 'undefined' || resolvedParams.userId === 'null') {
-          throw new Error('Invalid user ID in URL parameters')
+        console.log("Resolved params:", resolvedParams)
+
+        if (!resolvedParams.userId || resolvedParams.userId === "undefined" || resolvedParams.userId === "null") {
+          throw new Error("Invalid user ID in URL parameters")
         }
-        
+
         setUserId(resolvedParams.userId)
       } catch (error) {
-        console.error('Failed to resolve params:', error)
-        setError('Invalid URL parameters')
+        console.error("Failed to resolve params:", error)
+        setError("Invalid URL parameters")
         setLoading(false)
       }
     }
@@ -223,29 +218,29 @@ export default function SingleConversationPage({ params }: PageProps) {
 
   // Fetch user data function
   const fetchUserData = async (targetUserId: string): Promise<User> => {
-    console.log('Fetching user data for ID:', targetUserId)
-    
+    console.log("Fetching user data for ID:", targetUserId)
+
     // Try the primary endpoint first (matches your fixed API)
     const response = await fetch(`/api/users/${targetUserId}`, {
-      method: 'GET',
-      credentials: 'include',
+      method: "GET",
+      credentials: "include",
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
     })
 
     if (!response.ok) {
       // Handle specific HTTP status codes
       switch (response.status) {
         case 401:
-          throw new Error('You need to be logged in to view this conversation')
+          throw new Error("You need to be logged in to view this conversation")
         case 404:
-          throw new Error('User not found')
+          throw new Error("User not found")
         case 403:
-          throw new Error('You do not have permission to view this user')
+          throw new Error("You do not have permission to view this user")
         case 500:
-          throw new Error('Server error occurred while fetching user data')
+          throw new Error("Server error occurred while fetching user data")
         default:
           throw new Error(`Failed to fetch user data (Status: ${response.status})`)
       }
@@ -255,16 +250,16 @@ export default function SingleConversationPage({ params }: PageProps) {
     try {
       userData = await response.json()
     } catch (jsonError) {
-      console.error('Failed to parse JSON response:', jsonError)
-      throw new Error('Invalid response format from server')
+      console.error("Failed to parse JSON response:", jsonError)
+      throw new Error("Invalid response format from server")
     }
 
-    console.log('Received user data:', userData)
-    
+    console.log("Received user data:", userData)
+
     // Extract and validate user data
     const user = extractUserData(userData)
     if (!user) {
-      throw new Error('Failed to process user data')
+      throw new Error("Failed to process user data")
     }
 
     return user
@@ -284,21 +279,21 @@ export default function SingleConversationPage({ params }: PageProps) {
         setLoading(true)
         setError(null)
 
-        console.log('Initializing chat for userId:', userId)
+        console.log("Initializing chat for userId:", userId)
 
         // Fetch user information
         const userInfo = await fetchUserData(userId)
-        console.log('Successfully fetched user info:', userInfo)
+        console.log("Successfully fetched user info:", userInfo)
         setUser(userInfo)
 
         // Create or get existing channel via API
-        console.log('Creating/getting channel for user:', userInfo.id)
-        
+        console.log("Creating/getting channel for user:", userInfo.id)
+
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json"
+            Accept: "application/json",
           },
           credentials: "include",
           body: JSON.stringify({ recipientId: userInfo.id }),
@@ -306,19 +301,19 @@ export default function SingleConversationPage({ params }: PageProps) {
 
         if (!channelResponse.ok) {
           let errorMessage = `Failed to create channel (Status: ${channelResponse.status})`
-          
+
           try {
             const errorData = await channelResponse.json()
             errorMessage = errorData.error || errorMessage
           } catch {
             // If we can't parse the error response, use the default message
           }
-          
+
           throw new Error(errorMessage)
         }
 
         const channelData = await channelResponse.json()
-        console.log('Channel data received:', channelData)
+        console.log("Channel data received:", channelData)
 
         if (!channelData.channelId) {
           throw new Error("No channel ID received from server")
@@ -333,13 +328,15 @@ export default function SingleConversationPage({ params }: PageProps) {
             console.log(`Attempting to connect to channel: ${channelData.channelId} (${retries} retries left)`)
             streamChannel = client.channel("messaging", channelData.channelId)
             await streamChannel.watch()
-            console.log('Channel connected successfully:', channelData.channelId)
+            console.log("Channel connected successfully:", channelData.channelId)
             break
           } catch (channelError) {
             console.warn(`Channel connection attempt failed:`, channelError)
             retries--
             if (retries === 0) {
-              throw new Error(`Failed to connect to channel: ${channelError instanceof Error ? channelError.message : 'Unknown error'}`)
+              throw new Error(
+                `Failed to connect to channel: ${channelError instanceof Error ? channelError.message : "Unknown error"}`,
+              )
             }
             // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -351,8 +348,7 @@ export default function SingleConversationPage({ params }: PageProps) {
         }
 
         setChannel(streamChannel)
-        console.log('Chat initialization completed successfully')
-
+        console.log("Chat initialization completed successfully")
       } catch (err) {
         console.error("Chat initialization error:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to load conversation"
@@ -371,10 +367,13 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading conversation...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-sky-100 border-t-sky-400 mx-auto mb-6"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-sky-200/20 to-sky-400/20 animate-pulse"></div>
+          </div>
+          <p className="text-sky-600 font-medium">Loading conversation...</p>
         </div>
       </div>
     )
@@ -383,19 +382,20 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Unable to Load Conversation</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <div className="flex gap-2 justify-center">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
+        <div className="text-center max-w-md bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
+          <h2 className="text-xl font-semibold text-sky-700 mb-3">Unable to Load Conversation</h2>
+          <p className="text-sky-600 mb-6">{error}</p>
+          <div className="flex gap-3 justify-center">
             <Button
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white shadow-lg shadow-sky-200/50 hover:shadow-xl hover:shadow-sky-300/50 transition-all duration-300"
               onClick={() => router.push("/messages")}
             >
               Back to Messages
             </Button>
             <Button
               variant="outline"
+              className="border-sky-200 text-sky-600 hover:bg-sky-50 transition-all duration-300"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -409,79 +409,90 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Not ready state
   if (!channel || !user || !client || !isReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-blue-600">Setting up chat...</h2>
-          <p className="mt-2 text-gray-600">Please wait while we prepare your conversation.</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
+        <div className="text-center bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
+          <h2 className="text-xl font-semibold text-sky-600 mb-3">Setting up chat...</h2>
+          <p className="text-sky-500">Please wait while we prepare your conversation.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex h-screen flex-col bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       {/* Custom Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-white shadow-sm">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
-            className="p-2 hover:bg-gray-100"
+            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
             onClick={() => router.push("/messages")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-         
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={user.image} />
-            <AvatarFallback className="bg-blue-500 text-white">
+
+          <Avatar className="h-12 w-12 ring-2 ring-sky-100 ring-offset-2">
+            <AvatarImage src={user.image || "/placeholder.svg"} />
+            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
               {user.username?.[0]?.toUpperCase() || user.nickname?.[0]?.toUpperCase() || "?"}
             </AvatarFallback>
           </Avatar>
-         
+
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900">
-              {user.nickname || user.username}
-            </h3>
-            {user.metro_area && (
-              <p className="text-xs text-gray-500">{user.metro_area}</p>
-            )}
-            <p className="text-sm text-green-500">Online</p>
+            <h3 className="font-semibold text-sky-900 text-lg">{user.nickname || user.username}</h3>
+            {user.metro_area && <p className="text-sm text-sky-500">{user.metro_area}</p>}
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <p className="text-sm text-emerald-500 font-medium">Online</p>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-100">
-            <Phone className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          >
+            <Phone className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-100">
-            <Video className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          >
+            <Video className="h-5 w-5" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-100">
-                <MoreVertical className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+              >
+                <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <Info className="h-4 w-4 mr-2" />
+            <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
+              <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                <Info className="h-4 w-4 mr-3" />
                 Contact Info
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Volume2 className="h-4 w-4 mr-2" />
+              <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                <Volume2 className="h-4 w-4 mr-3" />
                 Mute Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Pin className="h-4 w-4 mr-2" />
+              <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                <Pin className="h-4 w-4 mr-3" />
                 Pin Chat
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Archive className="h-4 w-4 mr-2" />
+              <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                <Archive className="h-4 w-4 mr-3" />
                 Archive Chat
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
+              <DropdownMenuItem className="text-red-500 hover:bg-red-50">
+                <Trash2 className="h-4 w-4 mr-3" />
                 Delete Chat
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -510,12 +521,12 @@ export default function SingleConversationPage({ params }: PageProps) {
           __html: `
             .str-chat__main-panel {
               height: 100%;
-              background: #f8fafc;
+              background: linear-gradient(135deg, rgba(240, 249, 255, 0.3) 0%, rgba(255, 255, 255, 1) 50%, rgba(240, 249, 255, 0.3) 100%);
             }
            
             .str-chat__message-list {
-              padding: 1rem;
-              background: #f8fafc;
+              padding: 2rem;
+              background: transparent;
             }
            
             .str-chat__message-list-scroll {
@@ -523,37 +534,57 @@ export default function SingleConversationPage({ params }: PageProps) {
             }
            
             .str-chat__message-simple {
-              margin-bottom: 0.75rem;
+              margin-bottom: 1.5rem;
             }
            
             .str-chat__message-simple__content {
-              background: white;
-              border: none;
-              border-radius: 1.125rem;
-              padding: 0.75rem 1rem;
-              box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
+              border: 1px solid rgba(14, 165, 233, 0.1);
+              border-radius: 1.5rem;
+              padding: 1rem 1.25rem;
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
               max-width: 70%;
+              transition: all 0.3s ease;
+            }
+
+            .str-chat__message-simple__content:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.12), 0 2px 8px rgba(14, 165, 233, 0.08);
             }
            
             .str-chat__message-simple--me .str-chat__message-simple__content {
-              background: #3b82f6;
+              background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
               color: white;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.25), 0 1px 4px rgba(14, 165, 233, 0.15);
+            }
+
+            .str-chat__message-simple--me .str-chat__message-simple__content:hover {
+              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.35), 0 2px 8px rgba(14, 165, 233, 0.25);
             }
            
             .str-chat__message-simple__text {
-              font-size: 0.875rem;
-              line-height: 1.25rem;
+              font-size: 0.9rem;
+              line-height: 1.4;
               margin: 0;
+              font-weight: 400;
             }
            
             .str-chat__avatar {
-              width: 2rem;
-              height: 2rem;
-              margin-right: 0.5rem;
+              width: 2.5rem;
+              height: 2.5rem;
+              margin-right: 0.75rem;
+              border: 2px solid rgba(14, 165, 233, 0.1);
             }
            
             .str-chat__message-simple__actions {
               display: none;
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
+              border-radius: 0.75rem;
+              padding: 0.25rem;
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.1);
             }
            
             .str-chat__message-simple:hover .str-chat__message-simple__actions {
@@ -562,23 +593,25 @@ export default function SingleConversationPage({ params }: PageProps) {
            
             .str-chat__message-timestamp {
               font-size: 0.75rem;
-              color: #6b7280;
-              margin-top: 0.25rem;
+              color: #0ea5e9;
+              margin-top: 0.5rem;
+              font-weight: 500;
             }
            
             .str-chat__message-simple__status {
-              margin-top: 0.25rem;
+              margin-top: 0.5rem;
             }
            
             .str-chat__message-simple__status svg {
-              width: 0.875rem;
-              height: 0.875rem;
-              color: #3b82f6;
+              width: 1rem;
+              height: 1rem;
+              color: #0ea5e9;
             }
            
             .str-chat__thread {
-              border-left: 1px solid #e5e7eb;
-              background: white;
+              border-left: 1px solid rgba(14, 165, 233, 0.1);
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
             }
            
             .str-chat__message-list-scroll {
@@ -590,39 +623,57 @@ export default function SingleConversationPage({ params }: PageProps) {
             }
            
             .str-chat__message-list-scroll::-webkit-scrollbar-track {
-              background: #f1f5f9;
+              background: rgba(240, 249, 255, 0.5);
+              border-radius: 3px;
             }
            
             .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
-              background: #cbd5e1;
+              background: linear-gradient(135deg, #0ea5e9, #0284c7);
               border-radius: 3px;
             }
            
             .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
-              background: #94a3b8;
+              background: linear-gradient(135deg, #0284c7, #0369a1);
             }
            
             @keyframes slideInUp {
               from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px) scale(0.95);
               }
               to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
               }
             }
            
             .str-chat__message-simple {
-              animation: slideInUp 0.2s ease-out;
+              animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+
+            .str-chat__message-list {
+              animation: fadeIn 0.6s ease-out;
             }
            
             @media (max-width: 768px) {
               .str-chat__message-simple__content {
                 max-width: 85%;
               }
+              
+              .str-chat__message-list {
+                padding: 1rem;
+              }
             }
-          `
+          `,
         }}
       />
     </div>

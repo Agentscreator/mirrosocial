@@ -1,13 +1,15 @@
-'use client'
+"use client"
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { 
-  Search, 
-  Plus, 
-  MoreVertical, 
-  Phone, 
-  Video, 
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import {
+  Search,
+  Plus,
+  MoreVertical,
+  Phone,
+  Video,
   Info,
   Smile,
   Paperclip,
@@ -15,52 +17,45 @@ import {
   Check,
   CheckCheck,
   Volume2,
-  VolumeX,
   Archive,
   Trash2,
   Pin,
-  Users
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Users,
+  Settings,
+  MessageSquarePlus,
+  Sparkles,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Chat,
   Channel,
   MessageList,
-  MessageInput,
   Thread,
   Window,
   ChannelList,
   useChannelStateContext,
   useChatContext,
-  MessageInputFlat,
-  ChannelPreviewUIComponentProps,
-} from 'stream-chat-react'
-import { useStreamContext } from '@/components/providers/StreamProvider'
-import { Channel as StreamChannel } from 'stream-chat'
-import 'stream-chat-react/dist/css/v2/index.css'
+  type ChannelPreviewUIComponentProps,
+} from "stream-chat-react"
+import { useStreamContext } from "@/components/providers/StreamProvider"
+import type { Channel as StreamChannel } from "stream-chat"
+import "stream-chat-react/dist/css/v2/index.css"
 
 // Custom Channel Preview Component
 const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPreviewUIComponentProps) => {
   const { client } = useChatContext()
   const currentUser = client.user
-  
+
   // Get the other participant
-  const otherMember = Object.values(channel.state.members || {}).find(
-    member => member.user?.id !== currentUser?.id
-  )
-  
+  const otherMember = Object.values(channel.state.members || {}).find((member) => member.user?.id !== currentUser?.id)
+
   const lastMessage = channel.state.messages[channel.state.messages.length - 1]
   const unreadCount = channel.countUnread()
-  
+
   // Format timestamp
   const formatTime = (date: Date) => {
     const now = new Date()
@@ -68,8 +63,8 @@ const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPr
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
-    
-    if (minutes < 1) return 'now'
+
+    if (minutes < 1) return "now"
     if (minutes < 60) return `${minutes}m`
     if (hours < 24) return `${hours}h`
     if (days < 7) return `${days}d`
@@ -83,46 +78,44 @@ const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPr
   return (
     <div
       onClick={handleClick}
-      className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 transition-colors"
+      className="group flex items-center p-4 hover:bg-gradient-to-r hover:from-sky-50/50 hover:to-white cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-sm rounded-2xl mx-2 my-1"
     >
-      <div className="relative mr-3">
-        <Avatar className="h-12 w-12">
-          <AvatarImage src={otherMember?.user?.image} />
-          <AvatarFallback className="bg-blue-500 text-white">
-            {otherMember?.user?.name?.[0]?.toUpperCase() || '?'}
+      <div className="relative mr-4">
+        <Avatar className="h-14 w-14 ring-2 ring-sky-100/50 ring-offset-2 transition-all duration-300 group-hover:ring-sky-200">
+          <AvatarImage src={otherMember?.user?.image || "/placeholder.svg"} />
+          <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold text-lg">
+            {otherMember?.user?.name?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         {/* Online status indicator */}
-        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-400 border-2 border-white rounded-full"></div>
+        <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-400 border-3 border-white rounded-full shadow-sm animate-pulse"></div>
       </div>
-      
+
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-sm text-gray-900 truncate">
-            {otherMember?.user?.name || otherMember?.user?.id || 'Unknown'}
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-sky-900 truncate text-base">
+            {otherMember?.user?.name || otherMember?.user?.id || "Unknown"}
           </h3>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             {lastMessage && (
-              <span className="text-xs text-gray-500">
-                {formatTime(new Date(lastMessage.created_at!))}
-              </span>
+              <span className="text-xs text-sky-500 font-medium">{formatTime(new Date(lastMessage.created_at!))}</span>
             )}
             {unreadCount > 0 && (
-              <Badge className="bg-blue-500 text-white text-xs px-1.5 py-0.5 min-w-[1.25rem] h-5">
-                {unreadCount > 99 ? '99+' : unreadCount}
+              <Badge className="bg-gradient-to-r from-sky-400 to-sky-500 text-white text-xs px-2 py-1 min-w-[1.5rem] h-6 shadow-lg shadow-sky-200/50 animate-pulse">
+                {unreadCount > 99 ? "99+" : unreadCount}
               </Badge>
             )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-1">
+
+        <div className="flex items-center gap-2">
           {lastMessage?.user?.id === currentUser?.id && (
-            <div className="text-blue-500">
-              {lastMessage.status === 'received' ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+            <div className="text-sky-500 flex-shrink-0">
+              {lastMessage.status === "received" ? <CheckCheck className="h-4 w-4" /> : <Check className="h-4 w-4" />}
             </div>
           )}
-          <p className="text-sm text-gray-600 truncate">
-            {lastMessage?.text || lastMessage?.type || 'No messages yet'}
+          <p className="text-sm text-sky-600 truncate leading-relaxed">
+            {lastMessage?.text || lastMessage?.type || "No messages yet"}
           </p>
         </div>
       </div>
@@ -135,60 +128,71 @@ const CustomChannelHeader = () => {
   const { channel } = useChannelStateContext()
   const { client } = useChatContext()
   const currentUser = client.user
-  
-  const otherMember = Object.values(channel.state.members || {}).find(
-    member => member.user?.id !== currentUser?.id
-  )
+
+  const otherMember = Object.values(channel.state.members || {}).find((member) => member.user?.id !== currentUser?.id)
 
   return (
-    <div className="flex items-center justify-between p-4 border-b bg-white">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={otherMember?.user?.image} />
-          <AvatarFallback className="bg-blue-500 text-white">
-            {otherMember?.user?.name?.[0]?.toUpperCase() || '?'}
+    <div className="flex items-center justify-between p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+      <div className="flex items-center gap-4">
+        <Avatar className="h-12 w-12 ring-2 ring-sky-100 ring-offset-2">
+          <AvatarImage src={otherMember?.user?.image || "/placeholder.svg"} />
+          <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
+            {otherMember?.user?.name?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         <div>
-          <h2 className="font-semibold text-gray-900">
-            {otherMember?.user?.name || 'Unknown'}
-          </h2>
-          <p className="text-sm text-green-500">Online</p>
+          <h2 className="font-semibold text-sky-900 text-lg">{otherMember?.user?.name || "Unknown"}</h2>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+            <p className="text-sm text-emerald-500 font-medium">Online</p>
+          </div>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="p-2">
-          <Phone className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+        >
+          <Phone className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="sm" className="p-2">
-          <Video className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+        >
+          <Video className="h-5 w-5" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="p-2">
-              <MoreVertical className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            >
+              <MoreVertical className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Info className="h-4 w-4 mr-2" />
+          <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
+            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+              <Info className="h-4 w-4 mr-3" />
               Contact Info
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Volume2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+              <Volume2 className="h-4 w-4 mr-3" />
               Mute Notifications
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Pin className="h-4 w-4 mr-2" />
+            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+              <Pin className="h-4 w-4 mr-3" />
               Pin Chat
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Archive className="h-4 w-4 mr-2" />
+            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+              <Archive className="h-4 w-4 mr-3" />
               Archive Chat
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">
-              <Trash2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem className="text-red-500 hover:bg-red-50">
+              <Trash2 className="h-4 w-4 mr-3" />
               Delete Chat
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -200,7 +204,7 @@ const CustomChannelHeader = () => {
 
 // Custom Message Input Component
 const CustomMessageInput = () => {
-  const [text, setText] = useState('')
+  const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { channel } = useChannelStateContext()
 
@@ -212,14 +216,14 @@ const CustomMessageInput = () => {
       await channel.sendMessage({
         text: text.trim(),
       })
-      setText('')
+      setText("")
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error("Error sending message:", error)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
     }
@@ -228,8 +232,8 @@ const CustomMessageInput = () => {
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current
     if (textarea) {
-      textarea.style.height = 'auto'
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+      textarea.style.height = "auto"
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px"
     }
   }
 
@@ -238,57 +242,68 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="flex items-end gap-3 p-4 border-t bg-white">
-      <Button variant="ghost" size="sm" className="p-2 mb-1">
-        <Paperclip className="h-5 w-5 text-gray-500" />
-      </Button>
-      
-      <div className="flex-1 relative">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          className="w-full resize-none border rounded-full px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-[120px]"
-          rows={1}
-        />
+    <div className="p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-4">
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
+          className="p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
         >
-          <Smile className="h-4 w-4 text-gray-500" />
+          <Paperclip className="h-5 w-5" />
         </Button>
-      </div>
-      
-      <Button
-        onClick={handleSubmit}
-        disabled={!text.trim()}
-        className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full mb-1"
-      >
-        <Send className="h-4 w-4" />
-      </Button>
+
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
+            rows={1}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-sky-100 text-sky-500 rounded-full transition-all duration-200"
+          >
+            <Smile className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={!text.trim()}
+          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105"
+        >
+          <Send className="h-5 w-5" />
+        </Button>
+      </form>
     </div>
   )
 }
 
 // Empty State Component
 const EmptyState = () => (
-  <div className="flex-1 flex items-center justify-center bg-gray-50">
-    <div className="text-center">
-      <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Users className="h-12 w-12 text-blue-500" />
+  <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
+    <div className="text-center max-w-md">
+      <div className="relative mb-8">
+        <div className="w-32 h-32 bg-gradient-to-br from-sky-100 to-sky-200 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-sky-100/50">
+          <MessageSquarePlus className="h-16 w-16 text-sky-500" />
+        </div>
+        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-sky-400 to-sky-500 rounded-full flex items-center justify-center shadow-lg">
+          <Sparkles className="h-4 w-4 text-white" />
+        </div>
       </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-        Welcome to Messages
-      </h3>
-      <p className="text-gray-600 mb-6 max-w-sm">
-        Select a conversation to start chatting, or create a new conversation to connect with someone.
+      <h3 className="text-2xl font-bold text-sky-900 mb-3">Welcome to Messages</h3>
+      <p className="text-sky-600 mb-8 leading-relaxed">
+        Select a conversation to start chatting, or create a new conversation to connect with someone special.
       </p>
-      <Button className="bg-blue-500 hover:bg-blue-600 text-white">
-        <Plus className="h-4 w-4 mr-2" />
-        New Message
+      <Button className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white shadow-lg shadow-sky-200/50 hover:shadow-xl hover:shadow-sky-300/50 transition-all duration-300 hover:scale-105 px-8 py-3 rounded-full">
+        <Plus className="h-5 w-5 mr-2" />
+        Start New Chat
       </Button>
     </div>
   </div>
@@ -298,25 +313,28 @@ const EmptyState = () => (
 export default function MessagesPage() {
   const { client, isReady, error: streamError } = useStreamContext()
   const [activeChannel, setActiveChannel] = useState<StreamChannel | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
 
   // Custom setActiveChannel handler that matches the expected signature
   const handleSetActiveChannel = (
     newChannel?: StreamChannel,
     watchers?: { limit?: number; offset?: number },
-    event?: any
+    event?: any,
   ) => {
     setActiveChannel(newChannel || null)
   }
 
   if (streamError) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Chat Unavailable</h2>
-          <p className="text-gray-600 mb-4">{streamError}</p>
-          <Button onClick={() => window.location.reload()}>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
+        <div className="text-center bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
+          <h2 className="text-xl font-semibold text-red-500 mb-3">Chat Unavailable</h2>
+          <p className="text-sky-600 mb-6">{streamError}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white"
+          >
             Retry
           </Button>
         </div>
@@ -326,10 +344,13 @@ export default function MessagesPage() {
 
   if (!client || !isReady) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading chat...</p>
+          <div className="relative mb-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-sky-100 border-t-sky-400 mx-auto"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-sky-200/20 to-sky-400/20 animate-pulse"></div>
+          </div>
+          <p className="text-sky-600 font-medium">Loading chat...</p>
         </div>
       </div>
     )
@@ -338,16 +359,16 @@ export default function MessagesPage() {
   const currentUser = client.user
   if (!currentUser?.id) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-600">Unable to load user information</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
+        <p className="text-sky-600">Unable to load user information</p>
       </div>
     )
   }
 
   // Channel filters and options
   const channelListFilters = {
-    type: 'messaging',
-    members: { $in: [currentUser.id] }
+    type: "messaging",
+    members: { $in: [currentUser.id] },
   }
 
   const channelListSort = { last_message_at: -1 as const }
@@ -355,50 +376,68 @@ export default function MessagesPage() {
     limit: 20,
     state: true,
     watch: true,
-    presence: true
+    presence: true,
   }
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       <Chat client={client}>
         {/* Sidebar */}
-        <div className="w-80 border-r border-gray-200 flex flex-col">
+        <div className="w-96 border-r border-sky-100/50 flex flex-col bg-white/95 backdrop-blur-xl shadow-lg">
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-gray-200 bg-white">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-gray-900">Messages</h1>
+          <div className="p-6 border-b border-sky-100/50 bg-white/95 backdrop-blur-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-sky-500 rounded-full flex items-center justify-center shadow-lg shadow-sky-200/50">
+                  <MessageSquarePlus className="h-5 w-5 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold text-sky-900">Messages</h1>
+              </div>
               <div className="flex gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => router.push('/discover')}
-                  className="p-2"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/discover")}
+                  className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="p-2">
-                      <MoreVertical className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+                    >
+                      <MoreVertical className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>New Group</DropdownMenuItem>
-                    <DropdownMenuItem>Archived Chats</DropdownMenuItem>
-                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                  <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
+                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                      <Users className="h-4 w-4 mr-3" />
+                      New Group
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                      <Archive className="h-4 w-4 mr-3" />
+                      Archived Chats
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                      <Settings className="h-4 w-4 mr-3" />
+                      Settings
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             </div>
-            
+
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-sky-400" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-gray-100 border-none rounded-full"
+                className="pl-12 bg-sky-50/50 border-0 rounded-2xl h-12 placeholder:text-sky-400 focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 transition-all duration-300"
               />
             </div>
           </div>
@@ -409,12 +448,7 @@ export default function MessagesPage() {
               filters={channelListFilters}
               sort={channelListSort}
               options={channelListOptions}
-              Preview={(props) => (
-                <CustomChannelPreview 
-                  {...props}
-                  setActiveChannel={handleSetActiveChannel}
-                />
-              )}
+              Preview={(props) => <CustomChannelPreview {...props} setActiveChannel={handleSetActiveChannel} />}
               setActiveChannelOnMount={false}
             />
           </div>
@@ -440,56 +474,205 @@ export default function MessagesPage() {
       </Chat>
 
       {/* Custom Styles */}
-      <style jsx global>{`
-        .str-chat__main-panel {
-          height: 100%;
-        }
-        
-        .str-chat__message-list {
-          padding: 1rem;
-          background: #f8fafc;
-        }
-        
-        .str-chat__message-list-scroll {
-          height: 100%;
-        }
-        
-        .str-chat__message-simple {
-          margin-bottom: 0.5rem;
-        }
-        
-        .str-chat__message-simple__content {
-          background: white;
-          border: 1px solid #e2e8f0;
-          border-radius: 1rem;
-          padding: 0.75rem 1rem;
-          box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-        }
-        
-        .str-chat__message-simple--me .str-chat__message-simple__content {
-          background: #3b82f6;
-          color: white;
-          border-color: #3b82f6;
-        }
-        
-        .str-chat__message-simple__text {
-          font-size: 0.875rem;
-          line-height: 1.25rem;
-        }
-        
-        .str-chat__avatar {
-          width: 2rem;
-          height: 2rem;
-        }
-        
-        .str-chat__message-simple__actions {
-          display: none;
-        }
-        
-        .str-chat__message-simple:hover .str-chat__message-simple__actions {
-          display: flex;
-        }
-      `}</style>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .str-chat__main-panel {
+              height: 100%;
+              background: linear-gradient(135deg, rgba(240, 249, 255, 0.3) 0%, rgba(255, 255, 255, 1) 50%, rgba(240, 249, 255, 0.3) 100%);
+            }
+            
+            .str-chat__message-list {
+              padding: 2rem;
+              background: transparent;
+            }
+            
+            .str-chat__message-list-scroll {
+              height: 100%;
+            }
+            
+            .str-chat__message-simple {
+              margin-bottom: 1.5rem;
+            }
+            
+            .str-chat__message-simple__content {
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
+              border: 1px solid rgba(14, 165, 233, 0.1);
+              border-radius: 1.5rem;
+              padding: 1rem 1.25rem;
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
+              max-width: 70%;
+              transition: all 0.3s ease;
+            }
+
+            .str-chat__message-simple__content:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.12), 0 2px 8px rgba(14, 165, 233, 0.08);
+            }
+            
+            .str-chat__message-simple--me .str-chat__message-simple__content {
+              background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+              color: white;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.25), 0 1px 4px rgba(14, 165, 233, 0.15);
+            }
+
+            .str-chat__message-simple--me .str-chat__message-simple__content:hover {
+              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.35), 0 2px 8px rgba(14, 165, 233, 0.25);
+            }
+            
+            .str-chat__message-simple__text {
+              font-size: 0.9rem;
+              line-height: 1.4;
+              margin: 0;
+              font-weight: 400;
+            }
+            
+            .str-chat__avatar {
+              width: 2.5rem;
+              height: 2.5rem;
+              margin-right: 0.75rem;
+              border: 2px solid rgba(14, 165, 233, 0.1);
+            }
+            
+            .str-chat__message-simple__actions {
+              display: none;
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
+              border-radius: 0.75rem;
+              padding: 0.25rem;
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.1);
+            }
+            
+            .str-chat__message-simple:hover .str-chat__message-simple__actions {
+              display: flex;
+            }
+            
+            .str-chat__message-timestamp {
+              font-size: 0.75rem;
+              color: #0ea5e9;
+              margin-top: 0.5rem;
+              font-weight: 500;
+            }
+            
+            .str-chat__message-simple__status {
+              margin-top: 0.5rem;
+            }
+            
+            .str-chat__message-simple__status svg {
+              width: 1rem;
+              height: 1rem;
+              color: #0ea5e9;
+            }
+            
+            .str-chat__thread {
+              border-left: 1px solid rgba(14, 165, 233, 0.1);
+              background: rgba(255, 255, 255, 0.95);
+              backdrop-filter: blur(20px);
+            }
+            
+            .str-chat__message-list-scroll {
+              scroll-behavior: smooth;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar {
+              width: 6px;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-track {
+              background: rgba(240, 249, 255, 0.5);
+              border-radius: 3px;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
+              background: linear-gradient(135deg, #0ea5e9, #0284c7);
+              border-radius: 3px;
+            }
+            
+            .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(135deg, #0284c7, #0369a1);
+            }
+
+            .str-chat__channel-list {
+              background: transparent;
+            }
+
+            .str-chat__channel-list-messenger__main {
+              background: transparent;
+            }
+
+            .str-chat__channel-preview-messenger {
+              background: transparent;
+              border: none;
+              padding: 0;
+              margin: 0;
+            }
+
+            .str-chat__channel-preview-messenger:hover {
+              background: transparent;
+            }
+
+            .str-chat__channel-preview-messenger--active {
+              background: rgba(14, 165, 233, 0.05);
+              border-radius: 1rem;
+            }
+            
+            @keyframes slideInUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            
+            .str-chat__message-simple {
+              animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+
+            .str-chat__message-list {
+              animation: fadeIn 0.6s ease-out;
+            }
+
+            @keyframes slideInLeft {
+              from {
+                opacity: 0;
+                transform: translateX(-20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+
+            .str-chat__channel-list {
+              animation: slideInLeft 0.5s ease-out;
+            }
+            
+            @media (max-width: 768px) {
+              .str-chat__message-simple__content {
+                max-width: 85%;
+              }
+              
+              .str-chat__message-list {
+                padding: 1rem;
+              }
+            }
+          `,
+        }}
+      />
     </div>
   )
 }
