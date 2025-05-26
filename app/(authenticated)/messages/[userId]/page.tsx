@@ -11,25 +11,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { 
-  ArrowLeft, 
-  Phone, 
-  Video, 
-  MoreVertical, 
-  Info, 
-  Volume2, 
-  Archive, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Phone,
+  Video,
+  MoreVertical,
+  Info,
+  Volume2,
+  Archive,
+  Trash2,
   Pin,
   Paperclip,
   Smile,
   Send
 } from "lucide-react"
-import { 
-  Channel, 
-  MessageInput, 
-  MessageList, 
-  Thread, 
+import {
+  Channel,
+  MessageInput,
+  MessageList,
+  Thread,
   Window,
   MessageInputProps,
   useChatContext
@@ -46,10 +46,10 @@ interface User {
   profileImage?: string
 }
 
-// Enhanced user data extraction function
+// Enhanced user data extraction function - FIXED VERSION
 const extractUserData = (data: any): User | null => {
   console.log('Extracting user data from:', JSON.stringify(data, null, 2))
-  
+ 
   // Helper function to safely extract string values
   const safeString = (value: any): string | undefined => {
     if (value === null || value === undefined) return undefined
@@ -64,19 +64,19 @@ const extractUserData = (data: any): User | null => {
 
   // Helper function to get username/display name
   const getUsername = (obj: any): string | undefined => {
-    return safeString(obj.username) || 
-           safeString(obj.name) || 
-           safeString(obj.displayName) || 
+    return safeString(obj.username) ||
+           safeString(obj.name) ||
+           safeString(obj.displayName) ||
            safeString(obj.display_name) ||
            safeString(obj.handle)
   }
 
   // Helper function to get nickname/full name
   const getNickname = (obj: any): string | undefined => {
-    return safeString(obj.nickname) || 
-           safeString(obj.fullName) || 
+    return safeString(obj.nickname) ||
+           safeString(obj.fullName) ||
            safeString(obj.full_name) ||
-           safeString(obj.displayName) || 
+           safeString(obj.displayName) ||
            safeString(obj.display_name) ||
            safeString(obj.firstName && obj.lastName ? `${obj.firstName} ${obj.lastName}` : null) ||
            safeString(obj.first_name && obj.last_name ? `${obj.first_name} ${obj.last_name}` : null)
@@ -84,36 +84,41 @@ const extractUserData = (data: any): User | null => {
 
   // Helper function to get image URL
   const getImage = (obj: any): string | undefined => {
-    return safeString(obj.image) || 
-           safeString(obj.profileImage) || 
+    return safeString(obj.image) ||
+           safeString(obj.profileImage) ||
            safeString(obj.profile_image) ||
-           safeString(obj.avatar) || 
+           safeString(obj.avatar) ||
            safeString(obj.avatarUrl) ||
            safeString(obj.avatar_url) ||
            safeString(obj.photo) ||
            safeString(obj.picture)
   }
 
-  // Try different data structures
+  // Try different data structures - FIXED TO HANDLE { users: [...] }
   let candidate = null
 
-  // 1. Direct user object in 'user' property
-  if (data?.user && typeof data.user === 'object') {
+  // 1. Check for 'users' array property FIRST (this is your API format)
+  if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
+    candidate = data.users[0]
+    console.log('Found user in users array:', candidate)
+  }
+  // 2. Direct user object in 'user' property
+  else if (data?.user && typeof data.user === 'object') {
     candidate = data.user
   }
-  // 2. Direct user object in 'data' property  
+  // 3. Direct user object in 'data' property  
   else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
     candidate = data.data
   }
-  // 3. Array in 'data' property - take first item
+  // 4. Array in 'data' property - take first item
   else if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
     candidate = data.data[0]
   }
-  // 4. Direct array - take first item
+  // 5. Direct array - take first item
   else if (Array.isArray(data) && data.length > 0) {
     candidate = data[0]
   }
-  // 5. Direct object (root level)
+  // 6. Direct object (root level)
   else if (data && typeof data === 'object') {
     candidate = data
   }
@@ -198,7 +203,7 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
       <Button type="button" variant="ghost" size="sm" className="p-2 mb-1 hover:bg-gray-100">
         <Paperclip className="h-5 w-5 text-gray-500" />
       </Button>
-      
+     
       <div className="flex-1 relative">
         <textarea
           ref={textareaRef}
@@ -218,7 +223,7 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
           <Smile className="h-4 w-4 text-gray-500" />
         </Button>
       </div>
-      
+     
       <Button
         type="submit"
         disabled={!text.trim()}
@@ -285,7 +290,7 @@ export default function SingleConversationPage({ params }: PageProps) {
         // Fetch user information with multiple endpoint attempts
         let userData = null
         let userResponse = null
-        
+       
         // Try different API endpoints that might exist
         const endpoints = [
           `/api/users/${userId}`,
@@ -305,7 +310,7 @@ export default function SingleConversationPage({ params }: PageProps) {
                 'Content-Type': 'application/json'
               }
             })
-            
+           
             if (userResponse.ok) {
               userData = await userResponse.json()
               console.log(`Successfully fetched from ${endpoint}:`, userData)
@@ -339,10 +344,10 @@ export default function SingleConversationPage({ params }: PageProps) {
 
         // Create or get existing channel via API
         console.log('Creating/getting channel for user:', userInfo.id)
-        
+       
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "Accept": "application/json"
           },
@@ -475,14 +480,14 @@ export default function SingleConversationPage({ params }: PageProps) {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          
+         
           <Avatar className="h-10 w-10">
             <AvatarImage src={user.image} />
             <AvatarFallback className="bg-blue-500 text-white">
               {user.username?.[0]?.toUpperCase() || "?"}
             </AvatarFallback>
           </Avatar>
-          
+         
           <div className="flex-1">
             <h3 className="font-semibold text-gray-900">
               {user.nickname || user.username}
@@ -546,27 +551,27 @@ export default function SingleConversationPage({ params }: PageProps) {
       </div>
 
       {/* Custom Styles */}
-      <style 
+      <style
         dangerouslySetInnerHTML={{
           __html: `
             .str-chat__main-panel {
               height: 100%;
               background: #f8fafc;
             }
-            
+           
             .str-chat__message-list {
               padding: 1rem;
               background: #f8fafc;
             }
-            
+           
             .str-chat__message-list-scroll {
               height: 100%;
             }
-            
+           
             .str-chat__message-simple {
               margin-bottom: 0.75rem;
             }
-            
+           
             .str-chat__message-simple__content {
               background: white;
               border: none;
@@ -575,74 +580,74 @@ export default function SingleConversationPage({ params }: PageProps) {
               box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
               max-width: 70%;
             }
-            
+           
             .str-chat__message-simple--me .str-chat__message-simple__content {
               background: #3b82f6;
               color: white;
             }
-            
+           
             .str-chat__message-simple__text {
               font-size: 0.875rem;
               line-height: 1.25rem;
               margin: 0;
             }
-            
+           
             .str-chat__avatar {
               width: 2rem;
               height: 2rem;
               margin-right: 0.5rem;
             }
-            
+           
             .str-chat__message-simple__actions {
               display: none;
             }
-            
+           
             .str-chat__message-simple:hover .str-chat__message-simple__actions {
               display: flex;
             }
-            
+           
             .str-chat__message-timestamp {
               font-size: 0.75rem;
               color: #6b7280;
               margin-top: 0.25rem;
             }
-            
+           
             .str-chat__message-simple__status {
               margin-top: 0.25rem;
             }
-            
+           
             .str-chat__message-simple__status svg {
               width: 0.875rem;
               height: 0.875rem;
               color: #3b82f6;
             }
-            
+           
             .str-chat__thread {
               border-left: 1px solid #e5e7eb;
               background: white;
             }
-            
+           
             .str-chat__message-list-scroll {
               scroll-behavior: smooth;
             }
-            
+           
             .str-chat__message-list-scroll::-webkit-scrollbar {
               width: 6px;
             }
-            
+           
             .str-chat__message-list-scroll::-webkit-scrollbar-track {
               background: #f1f5f9;
             }
-            
+           
             .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
               background: #cbd5e1;
               border-radius: 3px;
             }
-            
+           
             .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
               background: #94a3b8;
             }
-            
+           
             @keyframes slideInUp {
               from {
                 opacity: 0;
@@ -653,11 +658,11 @@ export default function SingleConversationPage({ params }: PageProps) {
                 transform: translateY(0);
               }
             }
-            
+           
             .str-chat__message-simple {
               animation: slideInUp 0.2s ease-out;
             }
-            
+           
             @media (max-width: 768px) {
               .str-chat__message-simple__content {
                 max-width: 85%;
