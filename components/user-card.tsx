@@ -7,19 +7,18 @@ import { MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AnimatedText } from "@/components/animated-text"
 import { Badge } from "@/components/ui/badge"
-import { ReactNode } from "react"
 
 interface UserCardProps {
   user: {
     id: string | number
     username: string
     image: string
-    reason?: string | ReactNode // Changed to accept both string and JSX
+    reason?: string
     tags: string[]
   }
   onMessage?: () => void
   onViewProfile?: () => void
-  isMessaging?: boolean
+  isMessaging?: boolean // Added this prop to fix the TypeScript error
 }
 
 export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }: UserCardProps) {
@@ -58,11 +57,7 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
               <div className="mt-2">
                 <h4 className="font-medium text-blue-600 text-center sm:text-left">The Thread Between You:</h4>
                 <div className="mt-1">
-                  {typeof user.reason === 'string' ? (
-                    <AnimatedText text={user.reason} delay={500} speed={20} />
-                  ) : (
-                    user.reason
-                  )}
+                  <AnimatedText text={user.reason} delay={500} speed={20} />
                 </div>
               </div>
             )}
