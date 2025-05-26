@@ -23,7 +23,6 @@ import {
   Users,
   Settings,
   MessageSquarePlus,
-  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -288,53 +287,73 @@ const CustomMessageInput = () => {
 // Empty State Component
 const EmptyState = () => (
   <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 relative overflow-hidden">
-    {/* Floating geometric shapes */}
+    {/* Simple doodle elements */}
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-sky-200/20 to-sky-300/20 rounded-full blur-xl animate-pulse"></div>
-      <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-gradient-to-br from-sky-300/20 to-sky-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
-      <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-gradient-to-br from-sky-100/30 to-sky-200/30 rounded-full blur-lg animate-pulse delay-500"></div>
+      {/* Simple line doodles */}
+      <svg className="absolute top-1/4 left-1/4 w-16 h-16 text-sky-200/40" viewBox="0 0 64 64" fill="none">
+        <path
+          d="M8 32C8 32 16 24 32 32C48 40 56 32 56 32"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <circle cx="20" cy="20" r="2" fill="currentColor" />
+        <circle cx="44" cy="44" r="1.5" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute bottom-1/3 right-1/4 w-12 h-12 text-sky-200/40" viewBox="0 0 48 48" fill="none">
+        <path
+          d="M12 24L24 12L36 24L24 36Z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="8" cy="8" r="1" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute top-1/2 right-1/3 w-10 h-10 text-sky-200/40" viewBox="0 0 40 40" fill="none">
+        <path
+          d="M8 20C8 20 12 16 20 20C28 24 32 20 32 20"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <rect x="16" y="28" width="8" height="4" rx="2" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute top-1/3 left-1/2 w-8 h-8 text-sky-200/40" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="8" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <circle cx="24" cy="8" r="1" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute bottom-1/4 left-1/3 w-14 h-14 text-sky-200/40" viewBox="0 0 56 56" fill="none">
+        <path
+          d="M14 28L28 14L42 28"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M20 42C20 42 24 38 28 42C32 46 36 42 36 42"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
 
-    {/* Main content */}
-    <div className="text-center max-w-md relative z-10">
-      <div className="relative mb-12">
-        {/* Main icon container */}
-        <div className="w-40 h-40 bg-gradient-to-br from-sky-100/80 to-sky-200/80 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-sky-100/50 border border-sky-200/30">
-          <div className="w-32 h-32 bg-gradient-to-br from-sky-200/60 to-sky-300/60 rounded-full flex items-center justify-center">
-            <MessageSquarePlus className="h-20 w-20 text-sky-500/80" />
-          </div>
-        </div>
-
-        {/* Floating accent elements */}
-        <div className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-sky-400/80 to-sky-500/80 rounded-full flex items-center justify-center shadow-xl shadow-sky-200/50 animate-bounce">
-          <Sparkles className="h-6 w-6 text-white" />
-        </div>
-
-        {/* Orbiting elements */}
-        <div className="absolute top-8 -left-8 w-6 h-6 bg-gradient-to-r from-sky-300/60 to-sky-400/60 rounded-full animate-pulse"></div>
-        <div className="absolute bottom-8 -right-8 w-4 h-4 bg-gradient-to-r from-sky-200/60 to-sky-300/60 rounded-full animate-pulse delay-700"></div>
-      </div>
-
-      {/* Minimal, elegant text */}
-      <div className="space-y-6">
-        <h3 className="text-3xl font-light text-sky-900/80 tracking-wide">Your conversations await</h3>
-
-        {/* Subtle call to action */}
-        <div className="pt-4">
-          <Button className="bg-gradient-to-r from-sky-400/90 to-sky-500/90 hover:from-sky-500 hover:to-sky-600 text-white shadow-xl shadow-sky-200/40 hover:shadow-2xl hover:shadow-sky-300/50 transition-all duration-500 hover:scale-105 px-10 py-4 rounded-full border border-sky-300/20 backdrop-blur-sm">
-            <Plus className="h-5 w-5 mr-3" />
-            <span className="font-medium">Begin</span>
-          </Button>
-        </div>
-      </div>
-    </div>
+    {/* Minimal content area - completely empty */}
+    <div className="text-center max-w-md relative z-10">{/* Just empty space for clean, minimal look */}</div>
 
     {/* Subtle grid pattern overlay */}
     <div
-      className="absolute inset-0 opacity-[0.02]"
+      className="absolute inset-0 opacity-[0.015]"
       style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, rgb(14 165 233) 1px, transparent 0)`,
-        backgroundSize: "24px 24px",
+        backgroundSize: "32px 32px",
       }}
     ></div>
   </div>
