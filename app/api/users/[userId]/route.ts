@@ -1,4 +1,4 @@
-// app/api/users/[userId]/following/route.ts
+// app/api/users/[userId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
 import { db } from '@/src/db';
@@ -7,7 +7,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const session = await auth();
@@ -15,7 +15,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { userId } = params;
+    // Await params in Next.js 15
+    const { userId } = await params;
     const following = await getFollowing(userId, session.user.id);
     
     return NextResponse.json({ users: following });
