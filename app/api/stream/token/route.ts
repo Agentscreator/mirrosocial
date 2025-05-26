@@ -4,20 +4,32 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
 import { StreamChat } from "stream-chat"
 
-// Validate environment variables
+// Validate environment variables - but don't throw during build
 const STREAM_API_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY
 const STREAM_SECRET_KEY = process.env.STREAM_SECRET_KEY
 
-if (!STREAM_API_KEY || !STREAM_SECRET_KEY) {
-  console.error("Missing Stream Chat environment variables")
-  throw new Error("Stream Chat configuration error")
-}
+// Initialize StreamChat server client only when variables are available
+let serverClient: StreamChat | null = null
 
-// Initialize StreamChat server client
-const serverClient = StreamChat.getInstance(STREAM_API_KEY, STREAM_SECRET_KEY)
+if (STREAM_API_KEY && STREAM_SECRET_KEY) {
+  try {
+    serverClient = StreamChat.getInstance(STREAM_API_KEY, STREAM_SECRET_KEY)
+  } catch (error) {
+    console.error("Failed to initialize Stream Chat client:", error)
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Stream Chat is properly configured
+    if (!serverClient) {
+      console.error("Stream Chat client not initialized - missing environment variables")
+      return NextResponse.json({ 
+        error: "Stream Chat service unavailable",
+        details: "Configuration error"
+      }, { status: 503 })
+    }
+
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.id) {

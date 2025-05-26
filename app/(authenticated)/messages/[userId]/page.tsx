@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -19,23 +18,19 @@ import {
   MoreVertical, 
   Info, 
   Volume2, 
-  VolumeX, 
   Archive, 
   Trash2, 
   Pin,
   Paperclip,
   Smile,
-  Send,
-  Check,
-  CheckCheck
+  Send
 } from "lucide-react"
 import { 
   Channel, 
   MessageInput, 
   MessageList, 
   Thread, 
-  Window, 
-  Chat,
+  Window,
   MessageInputProps,
   useChatContext
 } from "stream-chat-react"
@@ -135,14 +130,15 @@ export default function SingleConversationPage() {
   const [channel, setChannel] = useState<StreamChannel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { client: streamClient, isReady, error: streamError } = useStreamContext()
+  const { client, isReady, error: streamError } = useStreamContext()
 
   useEffect(() => {
     const initializeChat = async () => {
-      if (!streamClient || !isReady || !userId || streamError) {
+      if (!client || !isReady || !userId || streamError) {
         if (streamError) {
           setError("Chat service unavailable")
         }
+        setLoading(false)
         return
       }
 
@@ -188,7 +184,7 @@ export default function SingleConversationPage() {
 
         while (retries > 0 && !streamChannel) {
           try {
-            streamChannel = streamClient.channel("messaging", channelId)
+            streamChannel = client.channel("messaging", channelId)
             await streamChannel.watch()
             break
           } catch (channelError) {
@@ -210,13 +206,8 @@ export default function SingleConversationPage() {
       }
     }
 
-    if (streamClient && isReady && userId && !streamError) {
-      initializeChat()
-    } else if (streamError) {
-      setError("Chat service unavailable")
-      setLoading(false)
-    }
-  }, [streamClient, isReady, userId, streamError])
+    initializeChat()
+  }, [client, isReady, userId, streamError])
 
   if (loading) {
     return (
@@ -250,7 +241,7 @@ export default function SingleConversationPage() {
     )
   }
 
-  if (!channel || !user || !streamClient) {
+  if (!channel || !user || !client || !isReady) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -329,21 +320,19 @@ export default function SingleConversationPage() {
         </div>
       </div>
 
-      {/* Stream Chat Integration */}
+      {/* Stream Chat Integration - No double Chat wrapper */}
       <div className="flex-1 flex">
-        <Chat client={streamClient} theme="str-chat__theme-light">
-          <Channel channel={channel}>
-            <Window>
-              <div className="flex flex-col h-full">
-                <div className="flex-1 overflow-hidden">
-                  <MessageList />
-                </div>
-                <CustomMessageInput />
+        <Channel channel={channel}>
+          <Window>
+            <div className="flex flex-col h-full">
+              <div className="flex-1 overflow-hidden">
+                <MessageList />
               </div>
-            </Window>
-            <Thread />
-          </Channel>
-        </Chat>
+              <CustomMessageInput />
+            </div>
+          </Window>
+          <Thread />
+        </Channel>
       </div>
 
       {/* Custom Styles */}

@@ -45,6 +45,7 @@ export function StreamProvider({ children }: { children: React.ReactNode }) {
     
     if (!session?.user?.id) {
       setIsLoading(false)
+      setIsReady(false)
       return
     }
 
@@ -64,34 +65,49 @@ export function StreamProvider({ children }: { children: React.ReactNode }) {
         // Check if user is already connected
         if (chatClient.userID === session.user.id) {
           setClient(chatClient)
-        setIsReady(true)
+          setIsReady(true)
           setIsLoading(false)
           return
+        }
+
+        // Disconnect any existing user first
+        if (chatClient.userID) {
+          await chatClient.disconnectUser()
         }
 
         // Get token from your API
         const tokenResponse = await fetch('/api/stream/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: session.user.id
+          })
         })
 
         if (!tokenResponse.ok) {
-          throw new Error('Failed to get Stream token')
+          throw new Error(`Failed to get Stream token: ${tokenResponse.status}`)
         }
 
         const { token } = await tokenResponse.json()
+
+        if (!token) {
+          throw new Error('No token received from API')
+        }
 
         // Connect user
         await chatClient.connectUser(
           {
             id: session.user.id,
             name: session.user.name || 'Unknown User',
-            image: session.user.image || undefined, // Convert null to undefined
+            image: session.user.image || undefined,
           },
           token
         )
 
         setClient(chatClient)
+        setIsReady(true)
+        console.log('Stream client connected successfully')
+        
       } catch (err) {
         console.error('Stream client initialization error:', err)
         setError(err instanceof Error ? err.message : 'Failed to initialize chat')
@@ -105,47 +121,59 @@ export function StreamProvider({ children }: { children: React.ReactNode }) {
 
     // Cleanup on unmount
     return () => {
-      if (chatClient?.userID) {
+      // Don't disconnect here as it might interfere with other components
+      // Only disconnect when the session changes or component unmounts completely
+    }
+  }, [session?.user?.id, status])
+
+  // Cleanup on unmount or session change
+  useEffect(() => {
+    return () => {
+      if (chatClient?.userID && status !== 'loading') {
         chatClient.disconnectUser()
           .catch(err => console.error('Error disconnecting user:', err))
       }
     }
-  }, [session, status])
+  }, [])
 
   if (status === 'loading' || isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
+      <StreamContext.Provider value={{ client: null, isLoading: true, error: null, isReady: false }}>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      </StreamContext.Provider>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center text-red-600">
-          <p>Chat initialization failed: {error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
-          >
-            Retry
-          </button>
+      <StreamContext.Provider value={{ client: null, isLoading: false, error, isReady: false }}>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center text-red-600">
+            <p>Chat initialization failed: {error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </StreamContext.Provider>
     )
   }
 
-  if (!session?.user?.id || !client) {
+  if (!session?.user?.id || !client || !isReady) {
     return (
-      <StreamContext.Provider value={{ client: null, isLoading: false, error: null, isReady: false }}>
+      <StreamContext.Provider value={{ client, isLoading: false, error: null, isReady }}>
         {children}
       </StreamContext.Provider>
     )
   }
 
   return (
-    <StreamContext.Provider value={{ client, isLoading, error, isReady }}>
+    <StreamContext.Provider value={{ client, isLoading: false, error: null, isReady: true }}>
       <Chat client={client} theme="messaging light">
         {children}
       </Chat>
