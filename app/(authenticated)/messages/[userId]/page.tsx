@@ -46,6 +46,114 @@ interface User {
   profileImage?: string
 }
 
+// Enhanced user data extraction function
+const extractUserData = (data: any): User | null => {
+  console.log('Extracting user data from:', JSON.stringify(data, null, 2))
+  
+  // Helper function to safely extract string values
+  const safeString = (value: any): string | undefined => {
+    if (value === null || value === undefined) return undefined
+    return String(value).trim() || undefined
+  }
+
+  // Helper function to get ID as string
+  const getId = (obj: any): string | undefined => {
+    const id = obj.id || obj._id || obj.userId || obj.user_id
+    return id ? String(id) : undefined
+  }
+
+  // Helper function to get username/display name
+  const getUsername = (obj: any): string | undefined => {
+    return safeString(obj.username) || 
+           safeString(obj.name) || 
+           safeString(obj.displayName) || 
+           safeString(obj.display_name) ||
+           safeString(obj.handle)
+  }
+
+  // Helper function to get nickname/full name
+  const getNickname = (obj: any): string | undefined => {
+    return safeString(obj.nickname) || 
+           safeString(obj.fullName) || 
+           safeString(obj.full_name) ||
+           safeString(obj.displayName) || 
+           safeString(obj.display_name) ||
+           safeString(obj.firstName && obj.lastName ? `${obj.firstName} ${obj.lastName}` : null) ||
+           safeString(obj.first_name && obj.last_name ? `${obj.first_name} ${obj.last_name}` : null)
+  }
+
+  // Helper function to get image URL
+  const getImage = (obj: any): string | undefined => {
+    return safeString(obj.image) || 
+           safeString(obj.profileImage) || 
+           safeString(obj.profile_image) ||
+           safeString(obj.avatar) || 
+           safeString(obj.avatarUrl) ||
+           safeString(obj.avatar_url) ||
+           safeString(obj.photo) ||
+           safeString(obj.picture)
+  }
+
+  // Try different data structures
+  let candidate = null
+
+  // 1. Direct user object in 'user' property
+  if (data?.user && typeof data.user === 'object') {
+    candidate = data.user
+  }
+  // 2. Direct user object in 'data' property  
+  else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+    candidate = data.data
+  }
+  // 3. Array in 'data' property - take first item
+  else if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+    candidate = data.data[0]
+  }
+  // 4. Direct array - take first item
+  else if (Array.isArray(data) && data.length > 0) {
+    candidate = data[0]
+  }
+  // 5. Direct object (root level)
+  else if (data && typeof data === 'object') {
+    candidate = data
+  }
+
+  if (!candidate) {
+    console.error('No valid candidate found in data structure')
+    return null
+  }
+
+  // Extract fields from candidate
+  const id = getId(candidate)
+  const username = getUsername(candidate)
+  const nickname = getNickname(candidate)
+  const image = getImage(candidate)
+
+  console.log('Extracted fields:', { id, username, nickname, image })
+
+  // Validate required fields
+  if (!id) {
+    console.error('No valid ID found in candidate:', candidate)
+    return null
+  }
+
+  if (!username && !nickname) {
+    console.error('No valid username or nickname found in candidate:', candidate)
+    return null
+  }
+
+  // Build user object
+  const user: User = {
+    id,
+    username: username || nickname || `user_${id}`,
+    nickname,
+    image
+  }
+
+  console.log('Final extracted user:', user)
+  return user
+}
+
 // Custom Message Input Component
 const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
   const [text, setText] = useState('')
@@ -147,103 +255,78 @@ export default function SingleConversationPage() {
         setError(null)
 
         // Validate userId format
-        if (!userId || userId === 'undefined' || userId === 'null') {
+        if (!userId || userId === 'undefined' || userId === 'null' || userId.trim() === '') {
           setError("Invalid user ID")
           return
         }
 
-        console.log('Fetching user data for userId:', userId)
+        console.log('Initializing chat for userId:', userId)
 
-        // Fetch user information first
-        const userResponse = await fetch(`/api/users/${userId}`)
-        if (!userResponse.ok) {
-          console.error('User fetch failed:', userResponse.status, userResponse.statusText)
-          if (userResponse.status === 404) {
-            setError("User not found")
-            return
+        // Fetch user information with multiple endpoint attempts
+        let userData = null
+        let userResponse = null
+        
+        // Try different API endpoints that might exist
+        const endpoints = [
+          `/api/users/${userId}`,
+          `/api/user/${userId}`,
+          `/api/users/profile/${userId}`,
+          `/api/profile/${userId}`
+        ]
+
+        for (const endpoint of endpoints) {
+          try {
+            console.log(`Trying endpoint: ${endpoint}`)
+            userResponse = await fetch(endpoint, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            })
+            
+            if (userResponse.ok) {
+              userData = await userResponse.json()
+              console.log(`Successfully fetched from ${endpoint}:`, userData)
+              break
+            } else {
+              console.warn(`Endpoint ${endpoint} failed with status:`, userResponse.status)
+            }
+          } catch (endpointError) {
+            console.warn(`Endpoint ${endpoint} threw error:`, endpointError)
+            continue
           }
-          throw new Error(`Failed to fetch user data: ${userResponse.status}`)
         }
 
-        const userData = await userResponse.json()
-        console.log('User data received:', JSON.stringify(userData, null, 2))
-
-        // Handle different possible response structures
-        let userInfo: User | null = null
-
-        // Try to extract user data from various possible structures
-        const extractUserData = (data: any): User | null => {
-          // Direct user object
-          if (data.user) {
-            const user = data.user
-            return {
-              id: user.id?.toString() || user._id?.toString() || user.userId?.toString(),
-              username: user.username || user.name || user.displayName,
-              nickname: user.nickname || user.displayName || user.fullName,
-              image: user.image || user.profileImage || user.avatar || user.photo,
-            }
-          }
-          
-          // Direct data structure
-          if (data.id || data._id || data.userId) {
-            return {
-              id: data.id?.toString() || data._id?.toString() || data.userId?.toString(),
-              username: data.username || data.name || data.displayName,
-              nickname: data.nickname || data.displayName || data.fullName,
-              image: data.image || data.profileImage || data.avatar || data.photo,
-            }
-          }
-
-          // Array response - take first item
-          if (Array.isArray(data) && data.length > 0) {
-            return extractUserData(data[0])
-          }
-
-          // Nested data structure
-          if (data.data) {
-            return extractUserData(data.data)
-          }
-
-          // Success wrapper
-          if (data.success && data.user) {
-            return extractUserData(data.user)
-          }
-
-          return null
+        if (!userData || !userResponse?.ok) {
+          console.error('All user fetch attempts failed')
+          setError("User not found")
+          return
         }
 
-        userInfo = extractUserData(userData)
+        // Extract user information using robust extraction
+        const userInfo = extractUserData(userData)
 
         if (!userInfo) {
-          console.error('Could not extract user data from response:', userData)
-          console.error('Available keys:', Object.keys(userData))
-          throw new Error(`Invalid user data structure. Available keys: ${Object.keys(userData).join(', ')}`)
+          console.error('Failed to extract user data from:', userData)
+          setError("Invalid user data received")
+          return
         }
 
-        // Validate required fields - be more flexible with username
-        if (!userInfo.id || (!userInfo.username && !userInfo.nickname)) {
-          console.error('Missing required user fields:', userInfo)
-          console.error('userInfo.id:', userInfo.id)
-          console.error('userInfo.username:', userInfo.username)
-          console.error('userInfo.nickname:', userInfo.nickname)
-          throw new Error(`Invalid user data: missing required fields. ID: ${userInfo.id}, Username: ${userInfo.username}, Nickname: ${userInfo.nickname}`)
-        }
-
-        // Ensure we have a displayable name
-        if (!userInfo.username && userInfo.nickname) {
-          userInfo.username = userInfo.nickname
-        }
-
-        console.log('Final user info:', userInfo)
-
+        console.log('Successfully extracted user info:', userInfo)
         setUser(userInfo)
 
-        console.log('Creating channel for user:', userInfo.id)
-
         // Create or get existing channel via API
+        console.log('Creating/getting channel for user:', userInfo.id)
+        
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          credentials: "include",
           body: JSON.stringify({ recipientId: userInfo.id }),
         })
 
@@ -256,14 +339,14 @@ export default function SingleConversationPage() {
             errorData = { error: errorText }
           }
           console.error('Channel creation failed:', errorData)
-          throw new Error(errorData.error || "Failed to create channel")
+          throw new Error(errorData.error || `Failed to create channel (${channelResponse.status})`)
         }
 
         const channelData = await channelResponse.json()
         console.log('Channel data received:', channelData)
 
         if (!channelData.channelId) {
-          throw new Error("No channel ID received")
+          throw new Error("No channel ID received from server")
         }
 
         // Connect to the channel with retry logic
@@ -272,21 +355,29 @@ export default function SingleConversationPage() {
 
         while (retries > 0 && !streamChannel) {
           try {
+            console.log(`Attempting to connect to channel: ${channelData.channelId} (${retries} retries left)`)
             streamChannel = client.channel("messaging", channelData.channelId)
             await streamChannel.watch()
             console.log('Channel connected successfully:', channelData.channelId)
             break
           } catch (channelError) {
-            console.warn(`Channel watch attempt failed, retries left: ${retries - 1}`, channelError)
+            console.warn(`Channel connection attempt failed:`, channelError)
             retries--
             if (retries === 0) {
-              throw channelError
+              throw new Error(`Failed to connect to channel after multiple attempts: ${channelError instanceof Error ? channelError.message : 'Unknown error'}`)
             }
+            // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000))
           }
         }
 
+        if (!streamChannel) {
+          throw new Error("Failed to establish channel connection")
+        }
+
         setChannel(streamChannel)
+        console.log('Chat initialization completed successfully')
+
       } catch (err) {
         console.error("Chat initialization error:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to load conversation"
@@ -316,14 +407,8 @@ export default function SingleConversationPage() {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center max-w-md">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">{error}</h2>
-          <p className="text-gray-600 mb-4">
-            {error === "User not found"
-              ? "This user doesn't exist or has been removed."
-              : error === "Invalid user ID"
-              ? "The user ID provided is not valid."
-              : "Unable to load this conversation. Please try again."}
-          </p>
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Unable to Load Conversation</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
           <div className="flex gap-2 justify-center">
             <Button
               className="bg-blue-600 hover:bg-blue-700"
@@ -347,8 +432,8 @@ export default function SingleConversationPage() {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-blue-600">Loading...</h2>
-          <p className="mt-2 text-gray-600">Setting up your conversation...</p>
+          <h2 className="text-xl font-semibold text-blue-600">Setting up chat...</h2>
+          <p className="mt-2 text-gray-600">Please wait while we prepare your conversation.</p>
         </div>
       </div>
     )
@@ -422,7 +507,7 @@ export default function SingleConversationPage() {
         </div>
       </div>
 
-      {/* Stream Chat Integration - No double Chat wrapper */}
+      {/* Stream Chat Integration */}
       <div className="flex-1 flex">
         <Channel channel={channel}>
           <Window>
@@ -437,7 +522,7 @@ export default function SingleConversationPage() {
         </Channel>
       </div>
 
-      {/* Custom Styles - Using dangerouslySetInnerHTML for global styles */}
+      {/* Custom Styles */}
       <style 
         dangerouslySetInnerHTML={{
           __html: `

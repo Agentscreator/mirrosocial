@@ -47,43 +47,74 @@ export default function DiscoverPage() {
     score: (apiUser as any).score ?? 0,
   })
 
- // Search users function
-const searchUsers = async (query: string) => {
-  if (!query.trim()) {
-    setSearchResults([]);
-    setShowSearchResults(false);
-    return;
-  }
-
-  setSearchLoading(true);
-  try {
-    const response = await fetch(
-      `/api/users/search?q=${encodeURIComponent(query)}&limit=10`,
-      {
-        method: "GET",
-        // include the NextAuth cookie so getServerSession() can authenticate
-        credentials: "include",
-      }
-    );
-
-    if (response.ok) {
-      const { users } = await response.json();
-      setSearchResults(users);
-      setShowSearchResults(true);
-    } else {
-      // optionally handle 401/other statuses if you want
-      console.warn("Search returned status", response.status);
+  // Search users function - FIXED
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
       setSearchResults([]);
       setShowSearchResults(false);
+      return;
     }
-  } catch (error) {
-    console.error("Search error:", error);
-    setSearchResults([]);
-    setShowSearchResults(false);
-  } finally {
-    setSearchLoading(false);
+
+    setSearchLoading(true);
+    try {
+      const response = await fetch(
+        `/api/users/search?q=${encodeURIComponent(query)}&limit=10`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Handle different response structures
+        let users: SearchUser[] = [];
+        
+        if (data.users && Array.isArray(data.users)) {
+          // Response has { users: [...] } structure
+          users = data.users.map((user: any) => ({
+            id: user.id?.toString() || user._id?.toString(),
+            username: user.username || user.name || user.displayName,
+            nickname: user.nickname || user.displayName || user.fullName,
+            image: user.image || user.profileImage || user.avatar
+          }));
+        } else if (Array.isArray(data)) {
+          // Response is directly an array
+          users = data.map((user: any) => ({
+            id: user.id?.toString() || user._id?.toString(),
+            username: user.username || user.name || user.displayName,
+            nickname: user.nickname || user.displayName || user.fullName,
+            image: user.image || user.profileImage || user.avatar
+          }));
+        } else if (data.data && Array.isArray(data.data)) {
+          // Response has { data: [...] } structure
+          users = data.data.map((user: any) => ({
+            id: user.id?.toString() || user._id?.toString(),
+            username: user.username || user.name || user.displayName,
+            nickname: user.nickname || user.displayName || user.fullName,
+            image: user.image || user.profileImage || user.avatar
+          }));
+        }
+
+        // Filter out invalid users
+        users = users.filter(user => user.id && user.username);
+        
+        setSearchResults(users);
+        setShowSearchResults(true);
+      } else {
+        console.warn("Search returned status", response.status);
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setSearchLoading(false);
+    }
   }
-}
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -135,16 +166,41 @@ const searchUsers = async (query: string) => {
     setShowSearchResults(false) // Hide search results
 
     try {
+      // First validate that the user exists
+      const userCheckResponse = await fetch(`/api/users/${userId}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!userCheckResponse.ok) {
+        throw new Error("User not found or inaccessible");
+      }
+
       // Create/get channel via API
       const response = await fetch("/api/stream/channel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ recipientId: userId }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create channel")
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
+        console.error("Channel creation failed:", errorData);
+        throw new Error(errorData.error || `Failed to create channel (${response.status})`);
+      }
+
+      const channelData = await response.json();
+      
+      if (!channelData.channelId) {
+        throw new Error("No channel ID received from server");
       }
 
       // Navigate to the message page immediately
@@ -153,7 +209,7 @@ const searchUsers = async (query: string) => {
       console.error("Error creating channel:", error)
       toast({
         title: "Error",
-        description: "Failed to start conversation. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to start conversation. Please try again.",
         variant: "destructive",
       })
     } finally {
