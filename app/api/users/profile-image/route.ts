@@ -1,88 +1,82 @@
 // app/api/users/profile-image/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-// @ts-ignore: no types for busboy’s constructor
-import Busboy from "busboy";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/src/lib/auth";     // your NextAuth config
-import { db } from "@/src/db";                    // Drizzle client
-import { usersTable } from "@/src/db/schema";     // your users table
+import { authOptions } from "@/src/lib/auth";
+import { db } from "@/src/db";
+import { usersTable } from "@/src/db/schema";
 import { eq } from "drizzle-orm";
+import { put } from '@vercel/blob';
 
-// --- your storage‐upload helper
 async function uploadToStorage(options: {
   buffer: Buffer;
   filename: string;
   mimetype: string;
   folder?: string;
 }): Promise<string> {
-  // TODO: wire this up to your S3 / Cloudinary / etc.
-  throw new Error("uploadToStorage() not implemented");
-}
+  const { buffer, filename, mimetype, folder = "profile-images" } = options;
+  
+  const timestamp = Date.now();
+  const fileExtension = filename.split('.').pop();
+  const uniqueFilename = `${timestamp}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+  const pathname = `${folder}/${uniqueFilename}`;
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export async function POST(req: NextRequest) {
-  // 1) Auth check
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
-  // 2) Busboy setup
-  const contentType = req.headers.get("content-type") ?? "";
-  // @ts-ignore: Busboy has no construct signature in this TS setup
-  const busboy = new Busboy({ headers: { "content-type": contentType } });
-
-  let imageUrl: string | null = null;
-
-  const finished = new Promise<void>((resolve, reject) => {
-    busboy.on(
-      "file",
-      (
-        _fieldname: string,
-        fileStream: NodeJS.ReadableStream,
-        filename: string,
-        _encoding: string,
-        mimetype: string
-      ) => {
-        const chunks: Buffer[] = [];
-        fileStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-        fileStream.on("end", async () => {
-          try {
-            const buffer = Buffer.concat(chunks);
-            imageUrl = await uploadToStorage({
-              buffer,
-              filename,
-              mimetype,
-              folder: "profile-images",
-            });
-            resolve();
-          } catch (err: any) {
-            reject(err);
-          }
-        });
-      }
-    );
-
-    // now our explicit any
-    busboy.on("error", (err: any) => reject(err));
-    busboy.on("finish", () => resolve());
-
-    req
-      .arrayBuffer()
-      .then((ab) => busboy.end(Buffer.from(ab)))
-      .catch((err: any) => reject(err));
+  const blob = await put(pathname, buffer, {
+    access: 'public',
+    contentType: mimetype,
   });
 
+  return blob.url;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    await finished;
-    if (!imageUrl) throw new Error("No file received");
+    console.log("Profile image upload started");
+    
+    // 1) Auth check
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
+    // 2) Parse form data
+    const formData = await req.formData();
+    console.log("FormData keys:", Array.from(formData.keys()));
+    
+    const file = formData.get('profileImage') as File;
+    
+    if (!file) {
+      console.log("No file found in formData");
+      return NextResponse.json({ message: "No file uploaded" }, { status: 400 });
+    }
+
+    console.log("File received:", {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ message: "File must be an image" }, { status: 400 });
+    }
+
+    // Validate file size (e.g., max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ message: "File too large (max 5MB)" }, { status: 400 });
+    }
+
+    // Convert file to buffer
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // 3) Upload to Vercel Blob storage
+    const imageUrl = await uploadToStorage({
+      buffer,
+      filename: file.name,
+      mimetype: file.type,
+      folder: "profile-images",
+    });
 
     // 4) Persist to your DB via Drizzle
     await db
@@ -90,12 +84,15 @@ export async function POST(req: NextRequest) {
       .set({ profileImage: imageUrl })
       .where(eq(usersTable.id, userId));
 
+    console.log("Profile image uploaded successfully:", imageUrl);
+
     // 5) Return the new URL
     return NextResponse.json({ imageUrl });
+
   } catch (error: any) {
     console.error("Profile-image upload error:", error);
     return NextResponse.json(
-      { error: error.message ?? "Upload failed" },
+      { message: error.message ?? "Upload failed" },
       { status: 500 }
     );
   }
