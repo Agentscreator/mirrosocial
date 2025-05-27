@@ -1,4 +1,3 @@
-// app/api/posts/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
 import { db } from '@/src/db';
@@ -14,10 +13,19 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const userIdParam = searchParams.get('userId');
 
     let posts;
-    if (userId) {
+    if (userIdParam) {
+      // Clean the userId in case it has query parameters attached
+      const cleanUserId = userIdParam.split('?')[0];
+      
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(cleanUserId)) {
+        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+      }
+
       // Fetch posts for a specific user with user info
       posts = await db.select({
         id: postsTable.id,
@@ -34,7 +42,7 @@ export async function GET(request: NextRequest) {
       })
       .from(postsTable)
       .leftJoin(usersTable, eq(postsTable.userId, usersTable.id))
-      .where(eq(postsTable.userId, userId))
+      .where(eq(postsTable.userId, cleanUserId))
       .orderBy(desc(postsTable.createdAt));
     } else {
       // Fetch all posts (for feed) with user info

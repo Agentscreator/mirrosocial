@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
-  context: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -18,10 +18,16 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const includeTags = searchParams.get('includeTags') === 'true'
 
-    const userId = context.params.userId
+    // Await the params promise
+    const params = await context.params
+    const userId = params.userId
+    
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
+
+    // Clean the userId in case it has query parameters attached
+    const cleanUserId = userId.split('?')[0]
 
     // Get user basic info
     const user = await db
@@ -36,7 +42,7 @@ export async function GET(
         created_at: usersTable.created_at
       })
       .from(usersTable)
-      .where(eq(usersTable.id, userId))
+      .where(eq(usersTable.id, cleanUserId))
       .limit(1)
 
     if (user.length === 0) {
@@ -58,7 +64,7 @@ export async function GET(
         })
         .from(userTagsTable)
         .innerJoin(tagsTable, eq(userTagsTable.tagId, tagsTable.id))
-        .where(eq(userTagsTable.userId, userId))
+        .where(eq(userTagsTable.userId, cleanUserId))
 
       response.tags = userTags
     }
