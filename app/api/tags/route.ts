@@ -19,10 +19,17 @@ export async function GET(request: NextRequest) {
       category: tagsTable.category,
     }).from(tagsTable);
 
-    return NextResponse.json(tags);
+    // Return tags wrapped in an object to match frontend expectations
+    return NextResponse.json({ 
+      tags,
+      count: tags.length 
+    });
   } catch (error) {
     console.error('Fetch tags error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      tags: [] // Provide fallback empty array
+    }, { status: 500 });
   }
 }
 
@@ -56,7 +63,10 @@ export async function POST(request: NextRequest) {
       category,
     }).returning();
 
-    return NextResponse.json(tag[0]);
+    return NextResponse.json({ 
+      tag: tag[0],
+      success: true 
+    });
   } catch (error) {
     console.error('Create tag error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

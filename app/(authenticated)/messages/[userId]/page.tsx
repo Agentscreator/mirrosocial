@@ -26,6 +26,8 @@ import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
 
+export const dynamic = 'force-dynamic'
+
 interface User {
   id: string
   username: string
