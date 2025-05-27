@@ -18,15 +18,14 @@ import {
   Trash2,
   Pin,
   Paperclip,
-  Smile,
   Send,
 } from "lucide-react"
-import { Channel, MessageList, Thread, Window, MessageInput, useChatContext } from "stream-chat-react"
+import { Channel, MessageList, Thread, Window, useChatContext } from "stream-chat-react"
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 interface User {
   id: string
@@ -59,7 +58,7 @@ const generateChannelId = (currentUserId: string, targetUserId: string): string 
   // Sort IDs to ensure consistent channel ID regardless of who initiates
   const sortedIds = [currentUserId, targetUserId].sort()
   const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`
-  
+
   // If the channel ID is too long, use a hash-based approach
   if (channelId.length > 64) {
     // Create a shorter ID using first 8 chars of each ID
@@ -67,7 +66,7 @@ const generateChannelId = (currentUserId: string, targetUserId: string): string 
     const shortId2 = sortedIds[1].substring(0, 8)
     return `dm_${shortId1}_${shortId2}_${Date.now().toString(36)}`
   }
-  
+
   return channelId
 }
 
@@ -133,7 +132,7 @@ const CustomMessageInput: React.FC = () => {
         text: text.trim(),
       })
       setText("")
-      
+
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto"
@@ -166,18 +165,18 @@ const CustomMessageInput: React.FC = () => {
   }, [text])
 
   return (
-    <div className="p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
-      <form onSubmit={handleSubmit} className="flex items-end gap-4">
+    <div className="p-3 sm:p-4 lg:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3 lg:gap-4">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          className="p-2 sm:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
         >
-          <Paperclip className="h-5 w-5" />
+          <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
         </Button>
 
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <textarea
             ref={textareaRef}
             value={text}
@@ -185,28 +184,20 @@ const CustomMessageInput: React.FC = () => {
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
             disabled={isSubmitting}
-            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full resize-none border-0 rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-3 sm:py-4 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             rows={1}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-sky-100 text-sky-500 rounded-full transition-all duration-200"
-          >
-            <Smile className="h-4 w-4" />
-          </Button>
         </div>
 
         <Button
           type="submit"
           disabled={!text.trim() || isSubmitting}
-          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105 disabled:hover:scale-100"
+          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-3 sm:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105 disabled:hover:scale-100 flex-shrink-0"
         >
           {isSubmitting ? (
-            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+            <div className="animate-spin h-4 w-4 sm:h-5 sm:w-5 border-2 border-white border-t-transparent rounded-full" />
           ) : (
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4 sm:h-5 sm:w-5" />
           )}
         </Button>
       </form>
@@ -335,21 +326,20 @@ export default function SingleConversationPage({ params }: PageProps) {
 
         // Try to create the channel directly with the Stream client first
         let streamChannel: StreamChannel
-        
+
         try {
           // Create the channel with both users as members
-          streamChannel = client.channel('messaging', channelId, {
+          streamChannel = client.channel("messaging", channelId, {
             members: [currentUser, userInfo.id],
             created_by_id: currentUser,
           })
-          
+
           // Watch the channel (this will create it if it doesn't exist)
           await streamChannel.watch()
           console.log("Channel connected successfully:", channelId)
-          
         } catch (streamError) {
           console.log("Direct Stream channel creation failed, trying API fallback:", streamError)
-          
+
           // Fallback to API approach if direct creation fails
           const channelResponse = await fetch("/api/stream/channel", {
             method: "POST",
@@ -358,9 +348,9 @@ export default function SingleConversationPage({ params }: PageProps) {
               Accept: "application/json",
             },
             credentials: "include",
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               recipientId: userInfo.id,
-              channelId: channelId // Pass our generated channel ID
+              channelId: channelId, // Pass our generated channel ID
             }),
           })
 
@@ -391,7 +381,6 @@ export default function SingleConversationPage({ params }: PageProps) {
 
         setChannel(streamChannel)
         console.log("Chat initialization completed successfully")
-        
       } catch (err) {
         console.error("Chat initialization error:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to load conversation"
@@ -410,7 +399,7 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50 p-4">
         <div className="text-center">
           <div className="relative">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-sky-100 border-t-sky-400 mx-auto mb-6"></div>
@@ -425,11 +414,11 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
-        <div className="text-center max-w-md bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
-          <h2 className="text-xl font-semibold text-sky-700 mb-3">Unable to Load Conversation</h2>
-          <p className="text-sky-600 mb-6">{error}</p>
-          <div className="flex gap-3 justify-center">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50 p-4">
+        <div className="text-center max-w-md w-full bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
+          <h2 className="text-lg sm:text-xl font-semibold text-sky-700 mb-3">Unable to Load Conversation</h2>
+          <p className="text-sky-600 mb-6 text-sm sm:text-base">{error}</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white shadow-lg shadow-sky-200/50 hover:shadow-xl hover:shadow-sky-300/50 transition-all duration-300"
               onClick={() => router.push("/messages")}
@@ -452,10 +441,10 @@ export default function SingleConversationPage({ params }: PageProps) {
   // Not ready state
   if (!channel || !user || !client || !isReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50">
-        <div className="text-center bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
-          <h2 className="text-xl font-semibold text-sky-600 mb-3">Setting up chat...</h2>
-          <p className="text-sky-500">Please wait while we prepare your conversation.</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-50 p-4">
+        <div className="text-center bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-xl shadow-sky-100/50 border border-sky-100/50">
+          <h2 className="text-lg sm:text-xl font-semibold text-sky-600 mb-3">Setting up chat...</h2>
+          <p className="text-sky-500 text-sm sm:text-base">Please wait while we prepare your conversation.</p>
         </div>
       </div>
     )
@@ -464,57 +453,59 @@ export default function SingleConversationPage({ params }: PageProps) {
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       {/* Custom Header */}
-      <div className="flex items-center justify-between p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between p-3 sm:p-4 lg:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="sm"
-            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            className="p-2 sm:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
             onClick={() => router.push("/messages")}
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
 
-          <Avatar className="h-12 w-12 ring-2 ring-sky-100 ring-offset-2">
+          <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-sky-100 ring-offset-2 flex-shrink-0">
             <AvatarImage src={user.image || "/placeholder.svg"} />
             <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
               {user.username?.[0]?.toUpperCase() || user.nickname?.[0]?.toUpperCase() || "?"}
             </AvatarFallback>
           </Avatar>
 
-          <div className="flex-1">
-            <h3 className="font-semibold text-sky-900 text-lg">{user.nickname || user.username}</h3>
-            {user.metro_area && <p className="text-sm text-sky-500">{user.metro_area}</p>}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sky-900 text-base sm:text-lg truncate">
+              {user.nickname || user.username}
+            </h3>
+            {user.metro_area && <p className="text-xs sm:text-sm text-sky-500 truncate">{user.metro_area}</p>}
             <div className="flex items-center gap-2 mt-1">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-              <p className="text-sm text-emerald-500 font-medium">Online</p>
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0"></div>
+              <p className="text-xs sm:text-sm text-emerald-500 font-medium">Online</p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
-            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            className="p-2 sm:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
           >
-            <Phone className="h-5 w-5" />
+            <Phone className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            className="p-2 sm:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
           >
-            <Video className="h-5 w-5" />
+            <Video className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+                className="p-2 sm:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
               >
-                <MoreVertical className="h-5 w-5" />
+                <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
@@ -544,7 +535,7 @@ export default function SingleConversationPage({ params }: PageProps) {
       </div>
 
       {/* Stream Chat Integration */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0">
         <Channel channel={channel}>
           <Window>
             <div className="flex flex-col h-full">
@@ -568,8 +559,20 @@ export default function SingleConversationPage({ params }: PageProps) {
             }
            
             .str-chat__message-list {
-              padding: 2rem;
+              padding: 1rem;
               background: transparent;
+            }
+
+            @media (min-width: 640px) {
+              .str-chat__message-list {
+                padding: 1.5rem;
+              }
+            }
+
+            @media (min-width: 1024px) {
+              .str-chat__message-list {
+                padding: 2rem;
+              }
             }
            
             .str-chat__message-list-scroll {
@@ -577,18 +580,38 @@ export default function SingleConversationPage({ params }: PageProps) {
             }
            
             .str-chat__message-simple {
-              margin-bottom: 1.5rem;
+              margin-bottom: 1rem;
+            }
+
+            @media (min-width: 640px) {
+              .str-chat__message-simple {
+                margin-bottom: 1.5rem;
+              }
             }
            
             .str-chat__message-simple__content {
               background: rgba(255, 255, 255, 0.95);
               backdrop-filter: blur(20px);
               border: 1px solid rgba(14, 165, 233, 0.1);
-              border-radius: 1.5rem;
-              padding: 1rem 1.25rem;
+              border-radius: 1rem;
+              padding: 0.75rem 1rem;
               box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
-              max-width: 70%;
+              max-width: 85%;
               transition: all 0.3s ease;
+            }
+
+            @media (min-width: 640px) {
+              .str-chat__message-simple__content {
+                border-radius: 1.5rem;
+                padding: 1rem 1.25rem;
+                max-width: 75%;
+              }
+            }
+
+            @media (min-width: 1024px) {
+              .str-chat__message-simple__content {
+                max-width: 70%;
+              }
             }
 
             .str-chat__message-simple__content:hover {
@@ -608,17 +631,31 @@ export default function SingleConversationPage({ params }: PageProps) {
             }
            
             .str-chat__message-simple__text {
-              font-size: 0.9rem;
+              font-size: 0.875rem;
               line-height: 1.4;
               margin: 0;
               font-weight: 400;
             }
+
+            @media (min-width: 640px) {
+              .str-chat__message-simple__text {
+                font-size: 0.9rem;
+              }
+            }
            
             .str-chat__avatar {
-              width: 2.5rem;
-              height: 2.5rem;
-              margin-right: 0.75rem;
+              width: 2rem;
+              height: 2rem;
+              margin-right: 0.5rem;
               border: 2px solid rgba(14, 165, 233, 0.1);
+            }
+
+            @media (min-width: 640px) {
+              .str-chat__avatar {
+                width: 2.5rem;
+                height: 2.5rem;
+                margin-right: 0.75rem;
+              }
             }
            
             .str-chat__message-simple__actions {
@@ -705,16 +742,6 @@ export default function SingleConversationPage({ params }: PageProps) {
 
             .str-chat__message-list {
               animation: fadeIn 0.6s ease-out;
-            }
-           
-            @media (max-width: 768px) {
-              .str-chat__message-simple__content {
-                max-width: 85%;
-              }
-              
-              .str-chat__message-list {
-                padding: 1rem;
-              }
             }
           `,
         }}
