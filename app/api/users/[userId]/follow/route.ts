@@ -1,13 +1,13 @@
-// app/api/users/[userId]/followers/route.ts (Enhanced version)
+// app/api/users/[userId]/follow/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
 import { db } from '@/src/db';
-import { followersTable, usersTable } from '@/src/db/schema';
-import { eq, and, inArray } from 'drizzle-orm'; // Make sure inArray is available
+import { followersTable } from '@/src/db/schema';
+import { eq, and } from 'drizzle-orm';
 
-export async function GET(
+export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const session = await auth();
@@ -15,54 +15,104 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { userId } = params;
-    const followers = await getFollowersEnhanced(userId, session.user.id);
-    
-    return NextResponse.json({ users: followers });
+    const { userId } = await params;
+    const currentUserId = session.user.id;
+
+    // Can't follow yourself
+    if (currentUserId === userId) {
+      return NextResponse.json(
+        { error: 'Cannot follow yourself' },
+        { status: 400 }
+      );
+    }
+
+    // Check if already following
+    const existingFollow = await db
+      .select()
+      .from(followersTable)
+      .where(
+        and(
+          eq(followersTable.followerId, currentUserId),
+          eq(followersTable.followingId, userId)
+        )
+      )
+      .limit(1);
+
+    let isFollowing: boolean;
+
+    if (existingFollow.length > 0) {
+      // Unfollow - delete the relationship
+      await db
+        .delete(followersTable)
+        .where(
+          and(
+            eq(followersTable.followerId, currentUserId),
+            eq(followersTable.followingId, userId)
+          )
+        );
+      isFollowing = false;
+    } else {
+      // Follow - create the relationship
+      await db.insert(followersTable).values({
+        followerId: currentUserId,
+        followingId: userId,
+      });
+      isFollowing = true;
+    }
+
+    return NextResponse.json({
+      success: true,
+      isFollowing,
+      message: isFollowing ? 'Successfully followed user' : 'Successfully unfollowed user'
+    });
+
   } catch (error) {
-    console.error('Error fetching followers:', error);
+    console.error('Error toggling follow status:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch followers' },
+      { error: 'Failed to toggle follow status' },
       { status: 500 }
     );
   }
 }
 
-async function getFollowersEnhanced(userId: string, currentUserId: string) {
-  // Get all followers of the user
-  const followersQuery = await db
-    .select({
-      id: usersTable.id,
-      username: usersTable.username,
-      nickname: usersTable.nickname,
-      profileImage: usersTable.profileImage,
-      image: usersTable.image,
-      metro_area: usersTable.metro_area,
-    })
-    .from(followersTable)
-    .innerJoin(usersTable, eq(followersTable.followerId, usersTable.id))
-    .where(eq(followersTable.followingId, userId));
+// Optional: GET method to check follow status
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (followersQuery.length === 0) {
-    return [];
-  }
+    const { userId } = await params;
+    const currentUserId = session.user.id;
 
-  // Get who the current user is following among these followers
-  const followerIds = followersQuery.map((f: any) => f.id);
-  const currentUserFollowing = await db
-    .select({ followingId: followersTable.followingId })
-    .from(followersTable)
-    .where(
-      and(
-        eq(followersTable.followerId, currentUserId),
-        inArray(followersTable.followingId, followerIds)
+    if (currentUserId === userId) {
+      return NextResponse.json({ isFollowing: false });
+    }
+
+    const followingCheck = await db
+      .select()
+      .from(followersTable)
+      .where(
+        and(
+          eq(followersTable.followerId, currentUserId),
+          eq(followersTable.followingId, userId)
+        )
       )
+      .limit(1);
+
+    return NextResponse.json({
+      isFollowing: followingCheck.length > 0
+    });
+
+  } catch (error) {
+    console.error('Error checking follow status:', error);
+    return NextResponse.json(
+      { error: 'Failed to check follow status' },
+      { status: 500 }
     );
-
-  const followingSet = new Set(currentUserFollowing.map((f: any) => f.followingId));
-
-  return followersQuery.map((follower: any) => ({
-    ...follower,
-    isFollowing: followingSet.has(follower.id)
-  }));
+  }
 }
