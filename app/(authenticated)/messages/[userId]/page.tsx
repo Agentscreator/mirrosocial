@@ -21,7 +21,7 @@ import {
   Smile,
   Send,
 } from "lucide-react"
-import { Channel, MessageList, Thread, Window, type MessageInputProps, useChatContext } from "stream-chat-react"
+import { Channel, MessageList, Thread, Window, MessageInput, useChatContext } from "stream-chat-react"
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
@@ -50,6 +50,23 @@ interface ApiResponse {
   metro_area?: string
   created_at?: string
   isFollowing?: boolean
+}
+
+// Function to generate a valid channel ID with length <= 64 characters
+const generateChannelId = (currentUserId: string, targetUserId: string): string => {
+  // Sort IDs to ensure consistent channel ID regardless of who initiates
+  const sortedIds = [currentUserId, targetUserId].sort()
+  const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`
+  
+  // If the channel ID is too long, use a hash-based approach
+  if (channelId.length > 64) {
+    // Create a shorter ID using first 8 chars of each ID
+    const shortId1 = sortedIds[0].substring(0, 8)
+    const shortId2 = sortedIds[1].substring(0, 8)
+    return `dm_${shortId1}_${shortId2}_${Date.now().toString(36)}`
+  }
+  
+  return channelId
 }
 
 // Improved user data extraction function that matches your API response format
@@ -98,22 +115,32 @@ const extractUserData = (data: ApiResponse): User | null => {
 }
 
 // Custom Message Input Component
-const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
+const CustomMessageInput: React.FC = () => {
   const [text, setText] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { channel } = useChatContext()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!text.trim() || !channel) return
+    if (!text.trim() || !channel || isSubmitting) return
 
     try {
+      setIsSubmitting(true)
       await channel.sendMessage({
         text: text.trim(),
       })
       setText("")
+      
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto"
+      }
     } catch (error) {
       console.error("Failed to send message:", error)
+      // You might want to show a toast notification here
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -155,7 +182,8 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
-            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
+            disabled={isSubmitting}
+            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             rows={1}
           />
           <Button
@@ -170,10 +198,14 @@ const CustomMessageInput: React.FC<MessageInputProps> = (props) => {
 
         <Button
           type="submit"
-          disabled={!text.trim()}
-          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105"
+          disabled={!text.trim() || isSubmitting}
+          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105 disabled:hover:scale-100"
         >
-          <Send className="h-5 w-5" />
+          {isSubmitting ? (
+            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+          ) : (
+            <Send className="h-5 w-5" />
+          )}
         </Button>
       </form>
     </div>
@@ -286,69 +318,78 @@ export default function SingleConversationPage({ params }: PageProps) {
         console.log("Successfully fetched user info:", userInfo)
         setUser(userInfo)
 
-        // Create or get existing channel via API
+        // Get current user ID from Stream client
+        const currentUser = client.userID
+        if (!currentUser) {
+          throw new Error("Current user not authenticated with Stream")
+        }
+
+        // Generate a valid channel ID
+        const channelId = generateChannelId(currentUser, userInfo.id)
+        console.log("Generated channel ID:", channelId, `(${channelId.length} characters)`)
+
+        // Create or get existing channel directly with Stream client
         console.log("Creating/getting channel for user:", userInfo.id)
 
-        const channelResponse = await fetch("/api/stream/channel", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({ recipientId: userInfo.id }),
-        })
+        // Try to create the channel directly with the Stream client first
+        let streamChannel: StreamChannel
+        
+        try {
+          // Create the channel with both users as members
+          streamChannel = client.channel('messaging', channelId, {
+            members: [currentUser, userInfo.id],
+            created_by_id: currentUser,
+          })
+          
+          // Watch the channel (this will create it if it doesn't exist)
+          await streamChannel.watch()
+          console.log("Channel connected successfully:", channelId)
+          
+        } catch (streamError) {
+          console.log("Direct Stream channel creation failed, trying API fallback:", streamError)
+          
+          // Fallback to API approach if direct creation fails
+          const channelResponse = await fetch("/api/stream/channel", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({ 
+              recipientId: userInfo.id,
+              channelId: channelId // Pass our generated channel ID
+            }),
+          })
 
-        if (!channelResponse.ok) {
-          let errorMessage = `Failed to create channel (Status: ${channelResponse.status})`
+          if (!channelResponse.ok) {
+            let errorMessage = `Failed to create channel (Status: ${channelResponse.status})`
 
-          try {
-            const errorData = await channelResponse.json()
-            errorMessage = errorData.error || errorMessage
-          } catch {
-            // If we can't parse the error response, use the default message
-          }
-
-          throw new Error(errorMessage)
-        }
-
-        const channelData = await channelResponse.json()
-        console.log("Channel data received:", channelData)
-
-        if (!channelData.channelId) {
-          throw new Error("No channel ID received from server")
-        }
-
-        // Connect to the channel with retry logic
-        let retries = 3
-        let streamChannel = null
-
-        while (retries > 0 && !streamChannel) {
-          try {
-            console.log(`Attempting to connect to channel: ${channelData.channelId} (${retries} retries left)`)
-            streamChannel = client.channel("messaging", channelData.channelId)
-            await streamChannel.watch()
-            console.log("Channel connected successfully:", channelData.channelId)
-            break
-          } catch (channelError) {
-            console.warn(`Channel connection attempt failed:`, channelError)
-            retries--
-            if (retries === 0) {
-              throw new Error(
-                `Failed to connect to channel: ${channelError instanceof Error ? channelError.message : "Unknown error"}`,
-              )
+            try {
+              const errorData = await channelResponse.json()
+              errorMessage = errorData.error || errorMessage
+            } catch {
+              // If we can't parse the error response, use the default message
             }
-            // Wait before retrying
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-          }
-        }
 
-        if (!streamChannel) {
-          throw new Error("Failed to establish channel connection")
+            throw new Error(errorMessage)
+          }
+
+          const channelData = await channelResponse.json()
+          console.log("Channel data received from API:", channelData)
+
+          const finalChannelId = channelData.channelId || channelId
+          console.log("Using final channel ID:", finalChannelId)
+
+          // Connect to the channel
+          streamChannel = client.channel("messaging", finalChannelId)
+          await streamChannel.watch()
+          console.log("Channel connected via API fallback:", finalChannelId)
         }
 
         setChannel(streamChannel)
         console.log("Chat initialization completed successfully")
+        
       } catch (err) {
         console.error("Chat initialization error:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to load conversation"
