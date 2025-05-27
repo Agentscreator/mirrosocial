@@ -18,12 +18,10 @@ import {
   Users,
   UserPlus,
   Camera,
-  Smile,
   Check,
   Eye,
   MoreHorizontal,
   RefreshCw,
-  MapPin,
 } from "lucide-react"
 import { ImageUpload } from "@/components/image-upload"
 import { useSession } from "next-auth/react"
@@ -39,9 +37,6 @@ import {
 } from "@/components/ui/dialog"
 import { TagSelector, type Tag as TagSelectorTag } from "@/components/tag-selector"
 import { toast } from "@/hooks/use-toast"
-
-
-
 
 interface Post {
   id: number
@@ -691,12 +686,6 @@ export default function ProfilePage() {
               <div className="flex flex-col items-center sm:items-start">
                 <div className="mb-3 sm:mb-4">
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1">{user.username}</h1>
-                  {user.metro_area && (
-                    <div className="flex items-center justify-center sm:justify-start gap-1 text-sm text-gray-500 mb-2">
-                      <MapPin className="h-3 w-3" />
-                      <span>{user.metro_area}</span>
-                    </div>
-                  )}
                   <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
                     <button
                       onClick={handleViewFollowers}
@@ -1066,17 +1055,13 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 sm:gap-2">
                         <ImageUpload onImageChange={handleImageChange} imagePreview={imagePreview} />
-                        <Button variant="ghost" size="sm" className="rounded-full hover:bg-blue-100 px-2 sm:px-3">
-                          <Smile className="h-4 w-4 mr-1 sm:mr-2" />
-                          <span className="hidden sm:inline text-sm">Emoji</span>
-                        </Button>
                       </div>
                       <Button
                         onClick={handlePostSubmit}
                         disabled={!newPost.trim() && !imagePreview}
-                        className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 sm:px-8 py-2.5 font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm transform hover:scale-105"
                       >
-                        <Send className="h-4 w-4 mr-1 sm:mr-2" />
+                        <Send className="h-4 w-4 mr-2" />
                         Share
                       </Button>
                     </div>
@@ -1092,82 +1077,82 @@ export default function ProfilePage() {
               posts.map((post) => (
                 <Card
                   key={post.id}
-                  className="rounded-xl sm:rounded-2xl border-blue-100 shadow-sm hover:shadow-md transition-all bg-white"
+                  className="rounded-xl sm:rounded-2xl border-blue-100 shadow-sm hover:shadow-md transition-all bg-white overflow-hidden"
                 >
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex gap-3 sm:gap-4">
-                      <div className="relative h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 overflow-hidden rounded-full">
+                  <CardContent className="p-3 sm:p-6">
+                    <div className="flex gap-2 sm:gap-4">
+                      <div className="relative h-8 w-8 sm:h-12 sm:w-12 flex-shrink-0 overflow-hidden rounded-full">
                         <Image
                           src={user.profileImage || user.image || "/placeholder.svg?height=48&width=48"}
                           alt={user.username}
                           fill
                           className="object-cover"
-                          sizes="(max-width: 640px) 40px, 48px"
+                          sizes="(max-width: 640px) 32px, 48px"
                         />
                       </div>
-                      <div className="flex-1 space-y-3 sm:space-y-4">
+                      <div className="flex-1 space-y-2 sm:space-y-4 min-w-0">
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                              <h3 className="font-semibold text-gray-900 text-xs sm:text-base truncate">
                                 {user.nickname || user.username}
                               </h3>
-                              <span className="text-xs sm:text-sm text-gray-500">@{user.username}</span>
+                              <span className="text-xs text-gray-500 truncate">@{user.username}</span>
                             </div>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">{formatDate(post.createdAt)}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">{formatDate(post.createdAt)}</p>
                           </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
+                            className="h-6 w-6 sm:h-8 sm:w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </div>
 
-                        <p className="text-gray-800 leading-relaxed text-sm sm:text-base">{post.content}</p>
+                        <p className="text-gray-800 leading-relaxed text-sm sm:text-base break-words">{post.content}</p>
 
                         {post.image && (
-                          <div className="rounded-xl sm:rounded-2xl overflow-hidden -mx-1 sm:mx-0">
+                          <div className="rounded-lg sm:rounded-xl overflow-hidden">
                             <Image
                               src={post.image || "/placeholder.svg"}
                               alt="Post image"
                               width={500}
                               height={300}
-                              className="w-full object-cover max-h-64 sm:max-h-80"
+                              className="w-full object-cover max-h-48 sm:max-h-80"
                             />
                           </div>
                         )}
 
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                          <div className="flex items-center gap-4 sm:gap-6">
+                          <div className="flex items-center gap-2 sm:gap-6">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleLikePost(post.id)}
                               className={cn(
-                                "flex items-center gap-1.5 sm:gap-2 rounded-full transition-colors px-2 sm:px-3 py-1.5 sm:py-2 -ml-2 sm:-ml-3",
+                                "flex items-center gap-1 rounded-full transition-colors px-2 py-1 -ml-2",
                                 post.isLiked ? "text-red-600 hover:bg-red-50" : "hover:bg-red-50 hover:text-red-600",
                               )}
                             >
-                              <Heart className={cn("h-4 w-4 sm:h-5 sm:w-5", post.isLiked && "fill-current")} />
-                              <span className="font-medium text-sm">{post.likes}</span>
+                              <Heart className={cn("h-3 w-3 sm:h-5 sm:w-5", post.isLiked && "fill-current")} />
+                              <span className="font-medium text-xs sm:text-sm">{post.likes}</span>
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="flex items-center gap-1.5 sm:gap-2 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 sm:px-3 py-1.5 sm:py-2"
+                              className="flex items-center gap-1 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 py-1"
                             >
-                              <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                              <span className="font-medium text-sm">{post.comments}</span>
+                              <MessageCircle className="h-3 w-3 sm:h-5 sm:w-5" />
+                              <span className="font-medium text-xs sm:text-sm">{post.comments}</span>
                             </Button>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors p-1.5 sm:p-2"
+                            className="rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors p-1"
                           >
-                            <Share2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <Share2 className="h-3 w-3 sm:h-5 sm:w-5" />
                           </Button>
                         </div>
                       </div>

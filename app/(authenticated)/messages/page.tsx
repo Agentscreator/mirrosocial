@@ -11,7 +11,6 @@ import {
   Phone,
   Video,
   Info,
-  Smile,
   Paperclip,
   Send,
   Check,
@@ -23,6 +22,7 @@ import {
   Users,
   Settings,
   MessageSquarePlus,
+  ArrowLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,6 +43,7 @@ import {
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
+import { cn } from "@/lib/utils"
 
 // Custom Channel Preview Component
 const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPreviewUIComponentProps) => {
@@ -123,7 +124,7 @@ const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPr
 }
 
 // Custom Channel Header
-const CustomChannelHeader = () => {
+const CustomChannelHeader = ({ onBack }: { onBack?: () => void }) => {
   const { channel } = useChannelStateContext()
   const { client } = useChatContext()
   const currentUser = client.user
@@ -131,46 +132,56 @@ const CustomChannelHeader = () => {
   const otherMember = Object.values(channel.state.members || {}).find((member) => member.user?.id !== currentUser?.id)
 
   return (
-    <div className="flex items-center justify-between p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-12 w-12 ring-2 ring-sky-100 ring-offset-2">
+    <div className="flex items-center justify-between p-4 md:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Mobile back button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="md:hidden p-2 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          onClick={onBack}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+
+        <Avatar className="h-10 w-10 md:h-12 md:w-12 ring-2 ring-sky-100 ring-offset-2">
           <AvatarImage src={otherMember?.user?.image || "/placeholder.svg"} />
           <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
             {otherMember?.user?.name?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         <div>
-          <h2 className="font-semibold text-sky-900 text-lg">{otherMember?.user?.name || "Unknown"}</h2>
+          <h2 className="font-semibold text-sky-900 text-base md:text-lg">{otherMember?.user?.name || "Unknown"}</h2>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-            <p className="text-sm text-emerald-500 font-medium">Online</p>
+            <p className="text-xs md:text-sm text-emerald-500 font-medium">Online</p>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 md:gap-2">
         <Button
           variant="ghost"
           size="sm"
-          className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
         >
-          <Phone className="h-5 w-5" />
+          <Phone className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
         >
-          <Video className="h-5 w-5" />
+          <Video className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+              className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
             >
-              <MoreVertical className="h-5 w-5" />
+              <MoreVertical className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
@@ -241,15 +252,16 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
-      <form onSubmit={handleSubmit} className="flex items-end gap-4">
+    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+          className="p-2 md:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
         >
-          <Paperclip className="h-5 w-5" />
+          <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
+          <span className="sr-only md:not-sr-only md:ml-1 text-xs">Media</span>
         </Button>
 
         <div className="flex-1 relative">
@@ -259,25 +271,17 @@ const CustomMessageInput = () => {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
-            className="w-full resize-none border-0 rounded-3xl px-6 py-4 pr-14 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
+            className="w-full resize-none border-0 rounded-2xl md:rounded-3xl px-4 md:px-6 py-3 md:py-4 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
             rows={1}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-sky-100 text-sky-500 rounded-full transition-all duration-200"
-          >
-            <Smile className="h-4 w-4" />
-          </Button>
         </div>
 
         <Button
           type="submit"
           disabled={!text.trim()}
-          className="bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-sky-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-sky-300/50 hover:scale-105"
+          className="bg-sky-500 hover:bg-sky-600 text-white p-3 md:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
         >
-          <Send className="h-5 w-5" />
+          <Send className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
       </form>
     </div>
@@ -432,8 +436,13 @@ export default function MessagesPage() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       <Chat client={client}>
-        {/* Sidebar */}
-        <div className="w-96 border-r border-sky-100/50 flex flex-col bg-white/95 backdrop-blur-xl shadow-lg">
+        {/* Sidebar - hidden on mobile when channel is active */}
+        <div
+          className={cn(
+            "w-full md:w-96 border-r border-sky-100/50 flex flex-col bg-white/95 backdrop-blur-xl shadow-lg",
+            activeChannel && "hidden md:flex",
+          )}
+        >
           {/* Sidebar Header */}
           <div className="p-6 border-b border-sky-100/50 bg-white/95 backdrop-blur-xl">
             <div className="flex items-center justify-between mb-6">
@@ -505,11 +514,11 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className={cn("flex-1 flex flex-col", !activeChannel && "hidden md:flex")}>
           {activeChannel ? (
             <Channel channel={activeChannel}>
               <Window>
-                <CustomChannelHeader />
+                <CustomChannelHeader onBack={() => setActiveChannel(null)} />
                 <div className="flex-1 overflow-hidden">
                   <MessageList />
                 </div>
