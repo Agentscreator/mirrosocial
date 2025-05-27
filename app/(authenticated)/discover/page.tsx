@@ -20,11 +20,17 @@ interface SearchUser {
   username: string
   nickname?: string
   image?: string
+  profileImage?: string // Add this field for the actual profile image
+}
+
+// Extended RecommendedUser type to include profileImage
+interface ExtendedRecommendedUser extends RecommendedUser {
+  profileImage?: string
 }
 
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [users, setUsers] = useState<RecommendedUser[]>([])
+  const [users, setUsers] = useState<ExtendedRecommendedUser[]>([])
   const [searchResults, setSearchResults] = useState<SearchUser[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -38,52 +44,60 @@ export default function DiscoverPage() {
   const { client: streamClient, isReady } = useStreamContext()
 
   // Helper function to convert API user to local user type
-  const convertApiUserToLocalUser = (apiUser: ApiRecommendedUser): RecommendedUser => ({
-    id: apiUser.id,
-    username: apiUser.username,
-    image: apiUser.image ?? null,
-    reason: apiUser.reason,
-    tags: apiUser.tags ?? [],
-    score: (apiUser as any).score ?? 0,
-  })
-
- // Search users function
-const searchUsers = async (query: string) => {
-  if (!query.trim()) {
-    setSearchResults([]);
-    setShowSearchResults(false);
-    return;
+  const convertApiUserToLocalUser = (apiUser: ApiRecommendedUser): ExtendedRecommendedUser => {
+    console.log("Converting API user:", apiUser) // Debug log
+    return {
+      id: apiUser.id,
+      username: apiUser.username,
+      // Use profileImage if available, fallback to image, then to null
+      image: (apiUser as any).profileImage || apiUser.image || null,
+      profileImage: (apiUser as any).profileImage,
+      reason: apiUser.reason,
+      tags: apiUser.tags ?? [],
+      score: (apiUser as any).score ?? 0,
+    }
   }
 
-  setSearchLoading(true);
-  try {
-    const response = await fetch(
-      `/api/users/search?q=${encodeURIComponent(query)}&limit=10`,
-      {
-        method: "GET",
-        // include the NextAuth cookie so getServerSession() can authenticate
-        credentials: "include",
-      }
-    );
+  // Function to get the correct image URL
+  const getImageUrl = (user: { image?: string | null; profileImage?: string | null }) => {
+    return user.profileImage || user.image || null
+  }
 
-    if (response.ok) {
-      const { users } = await response.json();
-      setSearchResults(users);
-      setShowSearchResults(true);
-    } else {
-      // optionally handle 401/other statuses if you want
-      console.warn("Search returned status", response.status);
+  // Search users function
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
       setSearchResults([]);
       setShowSearchResults(false);
+      return;
     }
-  } catch (error) {
-    console.error("Search error:", error);
-    setSearchResults([]);
-    setShowSearchResults(false);
-  } finally {
-    setSearchLoading(false);
+
+    setSearchLoading(true);
+    try {
+      const response = await fetch(
+        `/api/users/search?q=${encodeURIComponent(query)}&limit=10`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const { users } = await response.json();
+        setSearchResults(users);
+        setShowSearchResults(true);
+      } else {
+        console.warn("Search returned status", response.status);
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setSearchLoading(false);
+    }
   }
-}
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -110,17 +124,16 @@ const searchUsers = async (query: string) => {
   }
 
   const handleSearchBlur = () => {
-    // Delay hiding to allow clicks on search results
     setTimeout(() => setShowSearchResults(false), 200)
   }
 
-  // Navigate to user profile - FIXED
+  // Navigate to user profile
   const handleViewProfile = (userId: string) => {
-    setShowSearchResults(false) // Hide search results when navigating
+    setShowSearchResults(false)
     router.push(`/profile/${userId}`)
   }
 
-  // Start conversation with user - FIXED
+  // Start conversation with user
   const handleMessage = async (userId: string) => {
     if (!streamClient || !isReady) {
       toast({
@@ -132,10 +145,9 @@ const searchUsers = async (query: string) => {
     }
 
     setMessagingUser(userId)
-    setShowSearchResults(false) // Hide search results
+    setShowSearchResults(false)
 
     try {
-      // Create/get channel via API
       const response = await fetch("/api/stream/channel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,7 +159,6 @@ const searchUsers = async (query: string) => {
         throw new Error(errorData.error || "Failed to create channel")
       }
 
-      // Navigate to the message page immediately
       router.push(`/messages/${userId}`)
     } catch (error) {
       console.error("Error creating channel:", error)
@@ -167,7 +178,7 @@ const searchUsers = async (query: string) => {
       try {
         setLoading(true)
         const { users: recommendedUsers, hasMore: moreAvailable, nextPage } = await fetchRecommendations(1, 2)
-        const usersWithReasons: RecommendedUser[] = []
+        const usersWithReasons: ExtendedRecommendedUser[] = []
         for (const user of recommendedUsers) {
           const convertedUser = convertApiUserToLocalUser(user)
           convertedUser.reason = await generateExplanation(user)
@@ -264,58 +275,69 @@ const searchUsers = async (query: string) => {
               </div>
             ) : searchResults.length > 0 ? (
               <div className="py-2">
-                {searchResults.map((user) => (
-                  <div
-                    key={user.id}
-                    className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-8 w-8 overflow-hidden rounded-full">
-                          {user.image ? (
-                            <img
-                              src={user.image || "/placeholder.svg"}
-                              alt={user.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                {searchResults.map((user) => {
+                  const imageUrl = getImageUrl(user)
+                  return (
+                    <div
+                      key={user.id}
+                      className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-8 w-8 overflow-hidden rounded-full">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={user.username}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to initials if image fails to load
+                                  e.currentTarget.style.display = 'none'
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                                  if (fallback) fallback.style.display = 'flex'
+                                }}
+                              />
+                            ) : null}
+                            <div 
+                              className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold"
+                              style={{ display: imageUrl ? 'none' : 'flex' }}
+                            >
                               {user.username[0]?.toUpperCase() || "?"}
                             </div>
-                          )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{user.username}</div>
+                            {user.nickname && <div className="text-sm text-gray-500">{user.nickname}</div>}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{user.username}</div>
-                          {user.nickname && <div className="text-sm text-gray-500">{user.nickname}</div>}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewProfile(user.id)}
+                            className="rounded-full"
+                          >
+                            <User className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleMessage(user.id)}
+                            className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={messagingUser === user.id || !isReady}
+                          >
+                            {messagingUser === user.id ? (
+                              <div className="h-3 w-3 mr-1 animate-spin rounded-full border-b border-white"></div>
+                            ) : (
+                              <MessageCircle className="h-3 w-3 mr-1" />
+                            )}
+                            Message
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewProfile(user.id)}
-                          className="rounded-full"
-                        >
-                          <User className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleMessage(user.id)}
-                          className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
-                          disabled={messagingUser === user.id || !isReady}
-                        >
-                          {messagingUser === user.id ? (
-                            <div className="h-3 w-3 mr-1 animate-spin rounded-full border-b border-white"></div>
-                          ) : (
-                            <MessageCircle className="h-3 w-3 mr-1" />
-                          )}
-                          Message
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="p-4 text-center text-gray-500">No users found</div>
@@ -328,21 +350,26 @@ const searchUsers = async (query: string) => {
         {!showSearchResults && (
           <>
             {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <UserCard
-                  key={user.id}
-                  user={{
-                    id: user.id,
-                    username: user.username,
-                    image: user.image || "/placeholder.svg?height=100&width=100",
-                    reason: user.reason || "Calculating why you'd be a good match...",
-                    tags: user.tags || [],
-                  }}
-                  onMessage={() => handleMessage(user.id.toString())}
-                  onViewProfile={() => handleViewProfile(user.id.toString())}
-                  isMessaging={messagingUser === user.id.toString()}
-                />
-              ))
+              filteredUsers.map((user) => {
+                console.log("Rendering user card for:", user) // Debug log
+                return (
+                  <UserCard
+                    key={user.id}
+                    user={{
+                      id: user.id,
+                      username: user.username,
+                      // Pass both image and profileImage for consistency
+                      image: user.image || "/placeholder.svg?height=100&width=100",
+                      profileImage: user.profileImage, // Add this line to pass profileImage
+                      reason: user.reason || "Calculating why you'd be a good match...",
+                      tags: user.tags || [],
+                    }}
+                    onMessage={() => handleMessage(user.id.toString())}
+                    onViewProfile={() => handleViewProfile(user.id.toString())}
+                    isMessaging={messagingUser === user.id.toString()}
+                  />
+                )
+              })
             ) : (
               <div className="text-center py-8 text-gray-500">No matching users found</div>
             )}

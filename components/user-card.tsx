@@ -7,22 +7,35 @@ import { MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AnimatedText } from "@/components/animated-text"
 import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
 
 interface UserCardProps {
   user: {
     id: string | number
     username: string
     image: string
+    profileImage?: string // Add this field
     reason?: string
     tags: string[]
   }
   onMessage?: () => void
   onViewProfile?: () => void
-  isMessaging?: boolean // Added this prop to fix the TypeScript error
+  isMessaging?: boolean
 }
 
 export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }: UserCardProps) {
+  const [imageError, setImageError] = useState(false)
   const usernameInitial = user.username.charAt(0).toUpperCase()
+
+  // Debug logging
+  console.log("UserCard received user:", user)
+
+  // Function to get the correct image URL - same as discovery page
+  const getImageUrl = (user: { image?: string | null; profileImage?: string | null }) => {
+    const result = user.profileImage || user.image || null
+    console.log("getImageUrl result:", result, "from:", { profileImage: user.profileImage, image: user.image })
+    return result
+  }
 
   const handleMessage = () => {
     if (onMessage) {
@@ -36,18 +49,38 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
     }
   }
 
+  const handleImageError = () => {
+    setImageError(true)
+  }
+
+  // Get the actual image URL to use
+  const imageUrl = getImageUrl(user)
+
+  // Check if we should show fallback
+  const shouldShowFallback = imageError || 
+    !imageUrl ||
+    imageUrl.includes("placeholder.svg") || 
+    imageUrl === "/placeholder.svg?height=100&width=100"
+
   return (
     <Card className="border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
       <CardContent className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:gap-4">
           <div className="relative mx-auto mb-4 h-20 w-20 flex-shrink-0 overflow-hidden rounded-full shadow-md border-2 border-blue-200 sm:mx-0 sm:mb-0 sm:h-16 sm:w-16">
-            <Image
-              src={user.image || "/placeholder.svg"}
-              alt={user.username}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 80px, 64px"
-            />
+            {shouldShowFallback ? (
+              <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold">
+                {usernameInitial}
+              </div>
+            ) : (
+              <Image
+                src={imageUrl!}
+                alt={user.username}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 80px, 64px"
+                onError={handleImageError}
+              />
+            )}
           </div>
           <div className="flex-1">
             <h3 className="mb-2 text-center text-xl font-semibold text-blue-600 sm:mb-0 sm:text-left">
