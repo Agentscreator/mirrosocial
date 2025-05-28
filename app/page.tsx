@@ -29,7 +29,7 @@ export default function LandingPage() {
             <div className="flex flex-col justify-center">
               <h1 className="mb-6 text-4xl font-bold tracking-tight blue-text md:text-5xl">Reimagine Connect</h1>
               <p className="mb-6 text-lg premium-text-muted">
-                As humanity reaches new heights of innovation and understanding, Mirro is here to elevate how we connect. We're building a network that stands at the peak of digital interaction — thoughtful, intelligent, and human.
+                As humanity reaches new heights of innovation and understanding, Mirro is here to elevate how we connect. We're building a platform that stands at the peak of digital interaction — thoughtful, intelligent, and human.
               </p>
               <div className="mt-8">
                 <Link href="/signup">
