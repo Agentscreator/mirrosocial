@@ -59,7 +59,7 @@ export default function LandingPage() {
           <div className="container mx-auto max-w-4xl">
             <h2 className="mb-8 text-center text-3xl font-bold blue-text">Discover</h2>
             <p className="text-center text-lg premium-text-muted max-w-3xl mx-auto">
-              Let’s find people who resonate with us — not just follow us. Let’s make digital connection feel human again.
+              Let’s find people who resonate with us — not just follow us. Let’s make digital connection feel real.
             </p>
           </div>
         </section>
