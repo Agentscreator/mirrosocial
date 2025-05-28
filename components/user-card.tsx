@@ -50,17 +50,25 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
   }
 
   const handleImageError = () => {
+    console.log("Image failed to load:", imageUrl)
     setImageError(true)
   }
 
   // Get the actual image URL to use
   const imageUrl = getImageUrl(user)
 
-  // Check if we should show fallback
-  const shouldShowFallback = imageError || 
-    !imageUrl ||
-    imageUrl.includes("placeholder.svg") || 
-    imageUrl === "/placeholder.svg?height=100&width=100"
+  // Fixed fallback logic - only show fallback if:
+  // 1. Image failed to load (imageError is true), OR  
+  // 2. No image URL exists at all, OR
+  // 3. Image URL is explicitly a placeholder
+  const shouldShowFallback = imageError || !imageUrl || imageUrl.includes('placeholder.svg')
+
+  console.log("Image display logic:", {
+    imageUrl,
+    imageError,
+    shouldShowFallback,
+    user: user.username
+  })
 
   return (
     <Card className="border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">

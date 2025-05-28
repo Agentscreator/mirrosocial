@@ -38,44 +38,100 @@ export async function POST(
       )
       .limit(1);
 
-    let isFollowing: boolean;
-
     if (existingFollow.length > 0) {
-      // Unfollow - delete the relationship
-      await db
-        .delete(followersTable)
-        .where(
-          and(
-            eq(followersTable.followerId, currentUserId),
-            eq(followersTable.followingId, userId)
-          )
-        );
-      isFollowing = false;
-    } else {
-      // Follow - create the relationship
-      await db.insert(followersTable).values({
-        followerId: currentUserId,
-        followingId: userId,
-      });
-      isFollowing = true;
+      return NextResponse.json(
+        { error: 'Already following this user' },
+        { status: 400 }
+      );
     }
+
+    // Follow - create the relationship
+    await db.insert(followersTable).values({
+      followerId: currentUserId,
+      followingId: userId,
+    });
 
     return NextResponse.json({
       success: true,
-      isFollowing,
-      message: isFollowing ? 'Successfully followed user' : 'Successfully unfollowed user'
+      isFollowing: true,
+      message: 'Successfully followed user'
     });
 
   } catch (error) {
-    console.error('Error toggling follow status:', error);
+    console.error('Error following user:', error);
     return NextResponse.json(
-      { error: 'Failed to toggle follow status' },
+      { error: 'Failed to follow user' },
       { status: 500 }
     );
   }
 }
 
-// Optional: GET method to check follow status
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { userId } = await params;
+    const currentUserId = session.user.id;
+
+    // Can't unfollow yourself
+    if (currentUserId === userId) {
+      return NextResponse.json(
+        { error: 'Cannot unfollow yourself' },
+        { status: 400 }
+      );
+    }
+
+    // Check if currently following
+    const existingFollow = await db
+      .select()
+      .from(followersTable)
+      .where(
+        and(
+          eq(followersTable.followerId, currentUserId),
+          eq(followersTable.followingId, userId)
+        )
+      )
+      .limit(1);
+
+    if (existingFollow.length === 0) {
+      return NextResponse.json(
+        { error: 'Not currently following this user' },
+        { status: 400 }
+      );
+    }
+
+    // Unfollow - delete the relationship
+    await db
+      .delete(followersTable)
+      .where(
+        and(
+          eq(followersTable.followerId, currentUserId),
+          eq(followersTable.followingId, userId)
+        )
+      );
+
+    return NextResponse.json({
+      success: true,
+      isFollowing: false,
+      message: 'Successfully unfollowed user'
+    });
+
+  } catch (error) {
+    console.error('Error unfollowing user:', error);
+    return NextResponse.json(
+      { error: 'Failed to unfollow user' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET method to check follow status
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }

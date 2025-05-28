@@ -123,7 +123,12 @@ export default function DiscoverPage() {
     }
   }
 
-  const handleSearchBlur = () => {
+  const handleSearchBlur = (e: React.FocusEvent) => {
+    // Check if the blur is happening because user clicked inside the dropdown
+    const relatedTarget = e.relatedTarget as HTMLElement
+    if (relatedTarget && relatedTarget.closest('[data-search-dropdown]')) {
+      return // Don't hide if clicking inside dropdown
+    }
     setTimeout(() => setShowSearchResults(false), 200)
   }
 
@@ -268,7 +273,10 @@ export default function DiscoverPage() {
 
         {/* Search Results Dropdown */}
         {showSearchResults && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-blue-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+          <div 
+            className="absolute top-full left-0 right-0 mt-1 bg-white border border-blue-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
+            data-search-dropdown
+          >
             {searchLoading ? (
               <div className="p-4 text-center">
                 <TypingAnimation />
@@ -314,7 +322,10 @@ export default function DiscoverPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleViewProfile(user.id)}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              handleViewProfile(user.id)
+                            }}
                             className="rounded-full"
                           >
                             <User className="h-3 w-3 mr-1" />
@@ -322,7 +333,10 @@ export default function DiscoverPage() {
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => handleMessage(user.id)}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              handleMessage(user.id)
+                            }}
                             className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
                             disabled={messagingUser === user.id || !isReady}
                           >
@@ -358,9 +372,9 @@ export default function DiscoverPage() {
                     user={{
                       id: user.id,
                       username: user.username,
-                      // Pass both image and profileImage for consistency
-                      image: user.image || "/placeholder.svg?height=100&width=100",
-                      profileImage: user.profileImage, // Add this line to pass profileImage
+                      // Don't set a placeholder - let the component handle it
+                      image: user.image || "",
+                      profileImage: user.profileImage, // Pass the actual profileImage
                       reason: user.reason || "Calculating why you'd be a good match...",
                       tags: user.tags || [],
                     }}
