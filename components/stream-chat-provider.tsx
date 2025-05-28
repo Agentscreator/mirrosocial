@@ -1,106 +1,103 @@
-// components/stream-chat-provider.tsx
+//components/stream-chat-provider.tsx
 "use client"
 
-import { useEffect, useState } from 'react';
-import { Chat } from 'stream-chat-react';
-import { streamClient } from '@/src/lib/stream';
-import { useSession } from 'next-auth/react';
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { StreamChat } from "stream-chat"
+import { useSession } from "next-auth/react"
 
-interface StreamChatProviderProps {
-  children: React.ReactNode;
+interface StreamContextType {
+  client: StreamChat | null
+  isReady: boolean
+  error: string | null
 }
 
-export function StreamChatProvider({ children }: StreamChatProviderProps) {
-  const { data: session, status } = useSession();
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const StreamContext = createContext<StreamContextType>({
+  client: null,
+  isReady: false,
+  error: null,
+})
+
+export const useStreamContext = () => {
+  const context = useContext(StreamContext)
+  if (!context) {
+    throw new Error("useStreamContext must be used within a StreamProvider")
+  }
+  return context
+}
+
+interface StreamProviderProps {
+  children: React.ReactNode
+}
+
+export function StreamProvider({ children }: StreamProviderProps) {
+  const { data: session, status } = useSession()
+  const [client, setClient] = useState<StreamChat | null>(null)
+  const [isReady, setIsReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const initStream = async () => {
-      // Wait for session to load
-      if (status === 'loading') return;
-      
-      // If no session, don't try to connect
+    const initializeStream = async () => {
+      if (status === "loading") return
+
       if (!session?.user?.id) {
-        console.log('No session or user ID available');
-        return;
+        setError("User not authenticated")
+        return
       }
 
       try {
-        console.log('Initializing Stream Chat for user:', session.user.id);
-        
-        // Get token from your API
-        const response = await fetch('/api/stream/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: session.user.id
-          })
-        });
+        setError(null)
 
-        if (!response.ok) {
-          throw new Error(`Failed to get token: ${response.status} ${response.statusText}`);
+        const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
+        if (!apiKey) {
+          throw new Error("Stream API key not configured")
         }
 
-        const data = await response.json();
-        
-        if (!data.token) {
-          throw new Error('No token received from API');
+        // Create Stream client
+        const streamClient = StreamChat.getInstance(apiKey)
+
+        // Get token from our API
+        const tokenResponse = await fetch("/api/stream/token", {
+          method: "POST",
+          credentials: "include",
+        })
+
+        if (!tokenResponse.ok) {
+          const errorData = await tokenResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || "Failed to get Stream token")
         }
 
-        console.log('Token received, connecting to Stream...');
+        const { token } = await tokenResponse.json()
 
         // Connect user to Stream
         await streamClient.connectUser(
           {
             id: session.user.id,
-            name: session.user.name || session.user.email || 'User',
-            image: session.user.image,
+            name: session.user.name || session.user.email || "User",
+            image: session.user.image || undefined,
           },
-          data.token
-        );
+          token,
+        )
 
-        console.log('Stream Chat connected successfully');
-        setIsReady(true);
-        setError(null);
-      } catch (error) {
-        console.error('Stream initialization error:', error);
-        setError(error instanceof Error ? error.message : 'Unknown error');
+        setClient(streamClient)
+        setIsReady(true)
+      } catch (err) {
+        console.error("Stream initialization error:", err)
+        setError(err instanceof Error ? err.message : "Failed to initialize chat")
       }
-    };
+    }
 
-    initStream();
+    initializeStream()
 
+    // Cleanup function
     return () => {
-      if (streamClient.userID) {
-        console.log('Disconnecting Stream Chat user');
-        streamClient.disconnectUser();
+      if (client) {
+        client.disconnectUser()
+        setClient(null)
+        setIsReady(false)
       }
-    };
-  }, [session, status]);
+    }
+  }, [session, status])
 
-  // Show loading state while session is loading
-  if (status === 'loading') {
-    return <div>{children}</div>;
-  }
-
-  // Show error state if there's an error
-  if (error) {
-    console.warn('Stream Chat Provider Error:', error);
-    // Still render children but without Chat wrapper
-    return <div>{children}</div>;
-  }
-
-  // If no session, render without Chat wrapper
-  if (!session || !isReady) {
-    return <div>{children}</div>;
-  }
-
-  return (
-    <Chat client={streamClient}>
-      {children}
-    </Chat>
-  );
+  return <StreamContext.Provider value={{ client, isReady, error }}>{children}</StreamContext.Provider>
 }
