@@ -46,6 +46,7 @@ export const usersTable = pgTable("users", {
   image:            varchar("image", { length: 500 }), 
 });
 
+
 // Tags
 export const tagsTable = pgTable("tags", {
   id:       integer().primaryKey().generatedAlwaysAsIdentity(),

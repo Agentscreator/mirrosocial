@@ -239,10 +239,15 @@ export default function ProfilePage() {
 
         if (response.ok) {
           const data = await response.json()
-          console.log("Profile data fetched:", data)
+          console.log("Profile data fetched with counts:", {
+            username: data.user.username,
+            followers: data.user.followers,
+            following: data.user.following,
+            visitors: data.user.visitors,
+          })
           setUser(data.user)
           setEditedAbout(data.user.about || "")
-          console.log("✅ Successfully fetched profile")
+          console.log("✅ Successfully fetched profile with real counts")
         } else {
           const errorData = await response.json().catch(() => ({}))
           const errorMessage = errorData.message || "Failed to fetch profile"
@@ -281,6 +286,13 @@ export default function ProfilePage() {
             console.log("Visitor response status:", visitorResponse.status)
             if (visitorResponse.ok) {
               console.log("✅ Visitor count updated successfully")
+              // Refresh profile to get updated visitor count
+              const updatedResponse = await fetch(`/api/users/profile/${targetUserId}`)
+              if (updatedResponse.ok) {
+                const updatedData = await updatedResponse.json()
+                setUser(updatedData.user)
+                console.log("✅ Profile updated with new visitor count:", updatedData.user.visitors)
+              }
             } else {
               console.error("❌ Failed to update visitor count")
             }
@@ -308,6 +320,109 @@ export default function ProfilePage() {
       console.log("No session available")
     }
   }, [userId, session, isOwnProfile, fetchPosts])
+
+  // Add delete post handler
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm("Are you sure you want to delete this post?")) {
+      return
+    }
+
+    try {
+      console.log("=== DELETE POST DEBUG ===")
+      console.log("Deleting post ID:", postId)
+
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: "DELETE",
+      })
+      console.log("Delete response status:", response.status)
+
+      if (response.ok) {
+        // Remove post from state
+        const updatedPosts = posts.filter((post) => post.id !== postId)
+        setPosts(updatedPosts)
+
+        // Update cache
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            data: updatedPosts,
+            timestamp: Date.now(),
+          }),
+        )
+
+        toast({
+          title: "Success",
+          description: "Post deleted successfully!",
+        })
+        console.log("✅ Post deleted successfully")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to delete post"
+        console.error("❌ Failed to delete post:", errorMessage)
+        throw new Error(errorMessage)
+      }
+    } catch (error) {
+      console.error("❌ Error deleting post:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Add share post handler
+  const handleSharePost = async (postId: number) => {
+    try {
+      console.log("=== SHARE POST DEBUG ===")
+      console.log("Sharing post ID:", postId)
+
+      const response = await fetch(`/api/posts/${postId}/share`, {
+        method: "POST",
+      })
+      console.log("Share response status:", response.status)
+
+      if (response.ok) {
+        const shareData = await response.json()
+        console.log("Share data received:", shareData)
+
+        // Try to use native Web Share API if available
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: shareData.title,
+              text: shareData.text,
+              url: shareData.url,
+            })
+            console.log("✅ Shared via Web Share API")
+            return
+          } catch (shareError) {
+            console.log("Web Share API failed, falling back to clipboard")
+          }
+        }
+
+        // Fallback: Copy to clipboard
+        await navigator.clipboard.writeText(shareData.url)
+        toast({
+          title: "Link Copied!",
+          description: "Post link has been copied to your clipboard.",
+        })
+        console.log("✅ Link copied to clipboard")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to share post"
+        console.error("❌ Failed to share post:", errorMessage)
+        throw new Error(errorMessage)
+      }
+    } catch (error) {
+      console.error("❌ Error sharing post:", error)
+      toast({
+        title: "Error",
+        description: "Failed to share post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -1120,13 +1235,47 @@ export default function ProfilePage() {
                             </div>
                             <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">{formatDate(post.createdAt)}</p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 sm:h-8 sm:w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
-                          >
-                            <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
+                          {isOwnProfile && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeletePost(post.id)}
+                                className="h-6 w-6 sm:h-8 sm:w-8 rounded-full hover:bg-red-100 hover:text-red-600 flex-shrink-0"
+                                title="Delete post"
+                              >
+                                <svg
+                                  className="h-3 w-3 sm:h-4 sm:w-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 sm:h-8 sm:w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
+                              >
+                                <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                            </div>
+                          )}
+                          {!isOwnProfile && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 sm:h-8 sm:w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
+                            >
+                              <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          )}
                         </div>
 
                         <p className="text-gray-800 leading-relaxed text-sm sm:text-base break-words">{post.content}</p>
@@ -1173,7 +1322,9 @@ export default function ProfilePage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleSharePost(post.id)}
                             className="rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors p-1"
+                            title="Share post"
                           >
                             <Share2 className="h-3 w-3 sm:h-5 sm:w-5" />
                           </Button>
