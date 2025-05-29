@@ -21,21 +21,11 @@ import {
   Check,
   Eye,
   MoreHorizontal,
-  RefreshCw,
+  Paperclip,
 } from "lucide-react"
-import { ImageUpload } from "@/components/image-upload"
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { TagSelector, type Tag as TagSelectorTag } from "@/components/tag-selector"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "@/hooks/use-toast"
 
 interface Post {
@@ -61,12 +51,6 @@ interface ProfileUser {
   image?: string
 }
 
-interface Tag {
-  tagId: number
-  tagName: string
-  tagCategory: string
-}
-
 interface FollowUser {
   id: string
   username: string
@@ -83,7 +67,6 @@ export default function ProfilePage() {
   const isOwnProfile = !userId || userId === session?.user?.id
 
   const [user, setUser] = useState<ProfileUser | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [posts, setPosts] = useState<Post[]>([])
   const [followers, setFollowers] = useState<FollowUser[]>([])
   const [following, setFollowing] = useState<FollowUser[]>([])
@@ -95,46 +78,17 @@ export default function ProfilePage() {
   const [editedAbout, setEditedAbout] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false)
   const [isFollowersDialogOpen, setIsFollowersDialogOpen] = useState(false)
   const [isFollowingDialogOpen, setIsFollowingDialogOpen] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [userTags, setUserTags] = useState<string[]>([])
-
-  const [availableTags, setAvailableTags] = useState<TagSelectorTag[]>([])
-  const [interestTags, setInterestTags] = useState<string[]>([])
-  const [contextTags, setContextTags] = useState<string[]>([])
-  const [intentionTags, setIntentionTags] = useState<string[]>([])
 
   const cacheKey = `posts-${userId || session?.user?.id}`
-
-  // Fetch available tags from database
-  useEffect(() => {
-    const fetchAvailableTags = async () => {
-      try {
-        const response = await fetch("/api/tags")
-        if (response.ok) {
-          const data = await response.json()
-          const formattedTags: TagSelectorTag[] = data.tags.map((tag: any) => ({
-            id: tag.id.toString(),
-            name: tag.name,
-            category: tag.category,
-            color: getTagColor(tag.category),
-          }))
-          setAvailableTags(formattedTags)
-        }
-      } catch (error) {
-        console.error("Error fetching available tags:", error)
-      }
-    }
-
-    fetchAvailableTags()
-  }, [])
 
   const fetchPosts = useCallback(
     async (targetUserId: string, forceRefresh = false) => {
       try {
         setPostsLoading(true)
+        console.log(`Fetching posts for user ID: ${targetUserId}, forceRefresh: ${forceRefresh}`)
 
         if (!forceRefresh) {
           const cachedPosts = sessionStorage.getItem(cacheKey)
@@ -142,6 +96,7 @@ export default function ProfilePage() {
             const parsed = JSON.parse(cachedPosts)
             if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
               setPosts(parsed.data)
+              console.log("Posts loaded from cache")
               setPostsLoading(false)
               return
             }
@@ -149,8 +104,10 @@ export default function ProfilePage() {
         }
 
         const postsResponse = await fetch(`/api/posts?userId=${targetUserId}?t=${Date.now()}`)
+        console.log(`Posts API URL: /api/posts?userId=${targetUserId}?t=${Date.now()}`)
         if (postsResponse.ok) {
           const postsData = await postsResponse.json()
+          console.log("Posts data fetched:", postsData)
           const newPosts = postsData.posts || []
           setPosts(newPosts)
 
@@ -161,10 +118,15 @@ export default function ProfilePage() {
               timestamp: Date.now(),
             }),
           )
+          console.log("Posts saved to cache")
+          console.log("Successfully fetched posts")
         } else {
-          throw new Error("Failed to fetch posts")
+          const errorData = await postsResponse.json().catch(() => ({}))
+          const errorMessage = errorData.message || "Failed to fetch posts"
+          console.error("Failed to fetch posts:", errorMessage)
+          throw new Error(errorMessage)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching posts:", error)
         toast({
           title: "Error",
@@ -180,10 +142,19 @@ export default function ProfilePage() {
 
   const fetchFollowers = async (targetUserId: string) => {
     try {
+      console.log(`Fetching followers for user ID: ${targetUserId}`)
       const response = await fetch(`/api/users/${targetUserId}/followers`)
+      console.log(`Followers API URL: /api/users/${targetUserId}/followers`)
       if (response.ok) {
         const data = await response.json()
+        console.log("Followers data fetched:", data)
         setFollowers(data.followers || [])
+        console.log("Successfully fetched followers")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to fetch followers"
+        console.error("Failed to fetch followers:", errorMessage)
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Error fetching followers:", error)
@@ -192,10 +163,19 @@ export default function ProfilePage() {
 
   const fetchFollowing = async (targetUserId: string) => {
     try {
+      console.log(`Fetching following for user ID: ${targetUserId}`)
       const response = await fetch(`/api/users/${targetUserId}/following`)
+      console.log(`Following API URL: /api/users/${targetUserId}/following`)
       if (response.ok) {
         const data = await response.json()
+        console.log("Following data fetched:", data)
         setFollowing(data.following || [])
+        console.log("Successfully fetched following")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to fetch following"
+        console.error("Failed to fetch following:", errorMessage)
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Error fetching following:", error)
@@ -210,48 +190,59 @@ export default function ProfilePage() {
 
         if (!targetUserId) return
 
+        console.log(`Fetching profile for user ID: ${targetUserId}`)
         const response = await fetch(`/api/users/profile/${targetUserId}`)
+        console.log(`Profile API URL: /api/users/profile/${targetUserId}`)
+
         if (response.ok) {
           const data = await response.json()
+          console.log("Profile data fetched:", data)
           setUser(data.user)
-          setTags(data.tags || [])
           setEditedAbout(data.user.about || "")
 
-          const tagIds = data.tags?.map((tag: Tag) => tag.tagId.toString()) || []
-          setUserTags(tagIds)
-
-          setInterestTags(
-            tagIds.filter((tagId: string) => {
-              const tag = data.tags?.find((t: Tag) => t.tagId.toString() === tagId)
-              return tag?.tagCategory === "interest"
-            }),
-          )
-
-          setContextTags(
-            tagIds.filter((tagId: string) => {
-              const tag = data.tags?.find((t: Tag) => t.tagId.toString() === tagId)
-              return tag?.tagCategory === "context"
-            }),
-          )
-
-          setIntentionTags(
-            tagIds.filter((tagId: string) => {
-              const tag = data.tags?.find((t: Tag) => t.tagId.toString() === tagId)
-              return tag?.tagCategory === "intention"
-            }),
-          )
+          console.log("Successfully fetched profile")
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.message || "Failed to fetch profile"
+          console.error("Failed to fetch profile:", errorMessage)
+          throw new Error(errorMessage)
         }
 
         await fetchPosts(targetUserId)
 
         if (!isOwnProfile) {
           const followResponse = await fetch(`/api/users/${targetUserId}/follow-status`)
+          console.log(`Follow status API URL: /api/users/${targetUserId}/follow-status`)
           if (followResponse.ok) {
             const followData = await followResponse.json()
+            console.log("Follow status data fetched:", followData)
             setIsFollowing(followData.isFollowing)
+            console.log("Successfully fetched follow status")
+          } else {
+            const errorData = await followResponse.json().catch(() => ({}))
+            const errorMessage = errorData.message || "Failed to fetch follow status"
+            console.error("Failed to fetch follow status:", errorMessage)
+            throw new Error(errorMessage)
           }
         }
-      } catch (error) {
+
+        // Track visitors
+        if (!isOwnProfile) {
+          try {
+            const visitorResponse = await fetch(`/api/users/${targetUserId}/visit`, {
+              method: "POST",
+            })
+            console.log(`Visit API URL: /api/users/${targetUserId}/visit`)
+            if (visitorResponse.ok) {
+              console.log("Visitor count updated successfully")
+            } else {
+              console.error("Failed to update visitor count")
+            }
+          } catch (error) {
+            console.error("Error updating visitor count:", error)
+          }
+        }
+      } catch (error: any) {
         console.error("Error fetching profile:", error)
         toast({
           title: "Error",
@@ -287,13 +278,16 @@ export default function ProfilePage() {
         formData.append("image", imageFile)
       }
 
+      console.log("Creating new post...")
       const response = await fetch("/api/posts", {
         method: "POST",
         body: formData,
       })
+      console.log("Create post API URL: /api/posts")
 
       if (response.ok) {
         const newPostData = await response.json()
+        console.log("New post created:", newPostData)
         const updatedPosts = [newPostData, ...posts]
         setPosts(updatedPosts)
 
@@ -304,6 +298,7 @@ export default function ProfilePage() {
             timestamp: Date.now(),
           }),
         )
+        console.log("Posts saved to cache")
 
         setNewPost("")
         setImageFile(null)
@@ -313,10 +308,14 @@ export default function ProfilePage() {
           title: "Success",
           description: "Post created successfully!",
         })
+        console.log("Successfully created post")
       } else {
-        throw new Error("Failed to create post")
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to create post"
+        console.error("Failed to create post:", errorMessage)
+        throw new Error(errorMessage)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating post:", error)
       toast({
         title: "Error",
@@ -328,12 +327,15 @@ export default function ProfilePage() {
 
   const handleLikePost = async (postId: number) => {
     try {
+      console.log(`Liking post with ID: ${postId}`)
       const response = await fetch(`/api/posts/${postId}/like`, {
         method: "POST",
       })
+      console.log(`Like post API URL: /api/posts/${postId}/like`)
 
       if (response.ok) {
         const updatedPost = await response.json()
+        console.log("Post liked:", updatedPost)
         const updatedPosts = posts.map((post) =>
           post.id === postId ? { ...post, likes: updatedPost.likes, isLiked: updatedPost.isLiked } : post,
         )
@@ -346,6 +348,13 @@ export default function ProfilePage() {
             timestamp: Date.now(),
           }),
         )
+        console.log("Posts saved to cache")
+        console.log("Successfully liked post")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to like post"
+        console.error("Failed to like post:", errorMessage)
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Error liking post:", error)
@@ -394,6 +403,7 @@ export default function ProfilePage() {
 
     try {
       setProfileImageUploading(true)
+      console.log("Uploading profile image...")
 
       const formData = new FormData()
       formData.append("profileImage", file)
@@ -402,9 +412,11 @@ export default function ProfilePage() {
         method: "POST",
         body: formData,
       })
+      console.log("Profile image API URL: /api/users/profile-image")
 
       if (response.ok) {
         const data = await response.json()
+        console.log("Profile image uploaded:", data)
 
         setUser((prev) =>
           prev
@@ -420,16 +432,20 @@ export default function ProfilePage() {
           (key) => key.startsWith("profile-") || key.startsWith("posts-"),
         )
         profileCacheKeys.forEach((key) => sessionStorage.removeItem(key))
+        console.log("Profile cache cleared")
 
         toast({
           title: "Success",
           description: "Profile picture updated successfully!",
         })
+        console.log("Successfully updated profile picture")
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || "Failed to upload image")
+        const errorMessage = errorData.message || "Failed to upload image"
+        console.error("Failed to upload image:", errorMessage)
+        throw new Error(errorMessage)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading profile image:", error)
       toast({
         title: "Error",
@@ -444,6 +460,7 @@ export default function ProfilePage() {
 
   const handleSaveAbout = async () => {
     try {
+      console.log("Updating about section...")
       const response = await fetch("/api/users/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -451,9 +468,11 @@ export default function ProfilePage() {
           about: editedAbout,
         }),
       })
+      console.log("Update about API URL: /api/users/profile")
 
       if (response.ok) {
         const data = await response.json()
+        console.log("About section updated:", data)
         setUser((prev) => (prev ? { ...prev, about: data.user?.about || editedAbout } : null))
         setIsEditingAbout(false)
 
@@ -461,8 +480,12 @@ export default function ProfilePage() {
           title: "Success",
           description: "About section updated successfully!",
         })
+        console.log("Successfully updated about section")
       } else {
-        throw new Error("Failed to update about section")
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to update about section"
+        console.error("Failed to update about section:", errorMessage)
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Error updating about:", error)
@@ -474,48 +497,15 @@ export default function ProfilePage() {
     }
   }
 
-  const handleSaveTags = async () => {
-    try {
-      const allTags = [...interestTags, ...contextTags, ...intentionTags]
-
-      const response = await fetch("/api/users/tags", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tagIds: allTags.map((id) => Number.parseInt(id)),
-        }),
-      })
-
-      if (response.ok) {
-        const updatedTags = await response.json()
-        setTags(updatedTags.tags)
-        setUserTags(allTags)
-        setIsTagDialogOpen(false)
-
-        toast({
-          title: "Success",
-          description: "Tags updated successfully!",
-        })
-      } else {
-        throw new Error("Failed to update tags")
-      }
-    } catch (error) {
-      console.error("Error updating tags:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update tags. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleFollowToggle = async () => {
     if (!user || isOwnProfile) return
 
     try {
+      console.log(`Toggling follow status for user ID: ${user.id}, isFollowing: ${isFollowing}`)
       const response = await fetch(`/api/users/${user.id}/follow`, {
         method: isFollowing ? "DELETE" : "POST",
       })
+      console.log(`Follow toggle API URL: /api/users/${user.id}/follow`)
 
       if (response.ok) {
         setIsFollowing(!isFollowing)
@@ -532,8 +522,12 @@ export default function ProfilePage() {
           title: "Success",
           description: isFollowing ? "Unfollowed successfully!" : "Following successfully!",
         })
+        console.log("Successfully toggled follow status")
       } else {
-        throw new Error("Failed to toggle follow status")
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to toggle follow status"
+        console.error("Failed to toggle follow status:", errorMessage)
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Error toggling follow:", error)
@@ -549,28 +543,25 @@ export default function ProfilePage() {
     if (!user || isOwnProfile) return
 
     try {
+      console.log(`Creating message channel for user ID: ${user.id}`)
       const response = await fetch("/api/stream/channel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipientId: user.id }),
       })
+      console.log("Create channel API URL: /api/stream/channel")
 
       if (response.ok) {
         const data = await response.json()
+        console.log("Channel created:", data)
         router.push(`/messages/${user.id}`)
+        console.log("Successfully created channel")
       } else {
         router.push(`/messages/${user.id}`)
       }
     } catch (error) {
       console.error("Error creating channel:", error)
       router.push(`/messages/${user.id}`)
-    }
-  }
-
-  const handleRefreshPosts = async () => {
-    const targetUserId = userId || session?.user?.id
-    if (targetUserId) {
-      await fetchPosts(targetUserId, true)
     }
   }
 
@@ -596,19 +587,6 @@ export default function ProfilePage() {
       month: "short",
       day: "numeric",
     })
-  }
-
-  const getTagColor = (category: string) => {
-    switch (category) {
-      case "interest":
-        return "bg-blue-100 text-blue-700"
-      case "context":
-        return "bg-green-100 text-green-700"
-      case "intention":
-        return "bg-purple-100 text-purple-700"
-      default:
-        return "bg-gray-100 text-gray-700"
-    }
   }
 
   if (loading) {
@@ -799,96 +777,6 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-
-          {/* Mobile-Optimized Tags Section */}
-          {tags.length > 0 && (
-            <div className="mt-4 sm:mt-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Tags</h3>
-                {isOwnProfile && (
-                  <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full border-blue-200 hover:bg-blue-50 text-xs sm:text-sm px-3"
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="mx-4 sm:mx-auto sm:max-w-[600px] bg-background max-h-[80vh] overflow-y-auto rounded-2xl">
-                      <DialogHeader className="px-2 sm:px-0">
-                        <DialogTitle className="text-blue-600 text-lg">Edit Your Tags</DialogTitle>
-                        <DialogDescription className="text-sm">
-                          Update your interests, context, and intentions to help others connect with you.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-6 py-4 px-2 sm:px-0">
-                        <div>
-                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Interests</h3>
-                          <TagSelector
-                            tags={availableTags}
-                            selectedTags={interestTags}
-                            onChange={setInterestTags}
-                            maxSelections={5}
-                            category="interest"
-                          />
-                        </div>
-
-                        <div>
-                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Context</h3>
-                          <TagSelector
-                            tags={availableTags}
-                            selectedTags={contextTags}
-                            onChange={setContextTags}
-                            maxSelections={3}
-                            category="context"
-                          />
-                        </div>
-
-                        <div>
-                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Intentions</h3>
-                          <TagSelector
-                            tags={availableTags}
-                            selectedTags={intentionTags}
-                            onChange={setIntentionTags}
-                            maxSelections={3}
-                            category="intention"
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter className="flex-col gap-2 mt-4 px-2 sm:px-0 sm:flex-row">
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsTagDialogOpen(false)}
-                          className="rounded-full w-full sm:w-auto"
-                        >
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSaveTags} className="rounded-full w-full sm:w-auto">
-                          Save Changes
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag.tagId}
-                    className={cn(
-                      "rounded-full font-medium text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 transition-all hover:scale-105",
-                      getTagColor(tag.tagCategory),
-                    )}
-                  >
-                    {tag.tagName}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -990,16 +878,6 @@ export default function ProfilePage() {
             <h2 className="text-lg font-semibold text-gray-900">
               {isOwnProfile ? "Your Posts" : `${user.username}'s Posts`}
             </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshPosts}
-              disabled={postsLoading}
-              className="rounded-full"
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", postsLoading && "animate-spin")} />
-              Refresh
-            </Button>
           </div>
 
           {/* Mobile-Optimized Post Creation Widget */}
@@ -1054,7 +932,19 @@ export default function ProfilePage() {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 sm:gap-2">
-                        <ImageUpload onImageChange={handleImageChange} imagePreview={imagePreview} />
+                        <label className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full cursor-pointer transition-colors">
+                          <Paperclip className="h-4 w-4" />
+                          <span>Attach</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null
+                              handleImageChange(file)
+                            }}
+                            className="hidden"
+                          />
+                        </label>
                       </div>
                       <Button
                         onClick={handlePostSubmit}
@@ -1129,6 +1019,18 @@ export default function ProfilePage() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => {
+                                console.log(`Commenting on post with ID: ${post.id}`)
+                                // Add your comment handling logic here
+                              }}
+                              className="flex items-center gap-1 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 py-1"
+                            >
+                              <MessageCircle className="h-3 w-3 sm:h-5 sm:w-5" />
+                              <span className="font-medium text-xs sm:text-sm">Comment</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleLikePost(post.id)}
                               className={cn(
                                 "flex items-center gap-1 rounded-full transition-colors px-2 py-1 -ml-2",
@@ -1137,14 +1039,6 @@ export default function ProfilePage() {
                             >
                               <Heart className={cn("h-3 w-3 sm:h-5 sm:w-5", post.isLiked && "fill-current")} />
                               <span className="font-medium text-xs sm:text-sm">{post.likes}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex items-center gap-1 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 py-1"
-                            >
-                              <MessageCircle className="h-3 w-3 sm:h-5 sm:w-5" />
-                              <span className="font-medium text-xs sm:text-sm">{post.comments}</span>
                             </Button>
                           </div>
                           <Button

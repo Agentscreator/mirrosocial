@@ -1,3 +1,5 @@
+//app/api/posts/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
 import { db } from '@/src/db';
