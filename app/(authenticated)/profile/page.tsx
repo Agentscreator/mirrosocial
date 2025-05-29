@@ -82,6 +82,12 @@ export default function ProfilePage() {
   const [isFollowingDialogOpen, setIsFollowingDialogOpen] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
 
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false)
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
+  const [comments, setComments] = useState<any[]>([])
+  const [newComment, setNewComment] = useState("")
+  const [commentsLoading, setCommentsLoading] = useState(false)
+
   const cacheKey = `posts-${userId || session?.user?.id}`
 
   const fetchPosts = useCallback(
@@ -320,6 +326,83 @@ export default function ProfilePage() {
       console.log("No session available")
     }
   }, [userId, session, isOwnProfile, fetchPosts])
+
+  const handleOpenComments = async (postId: number) => {
+    setSelectedPostId(postId)
+    setCommentDialogOpen(true)
+    await fetchComments(postId)
+  }
+
+  const fetchComments = async (postId: number) => {
+    try {
+      setCommentsLoading(true)
+      console.log("=== FETCHING COMMENTS DEBUG ===")
+      console.log("Fetching comments for post ID:", postId)
+
+      const response = await fetch(`/api/posts/${postId}/comments`)
+      console.log("Comments response status:", response.status)
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Comments fetched:", data.comments?.length || 0)
+        setComments(data.comments || [])
+      } else {
+        console.error("Failed to fetch comments")
+        setComments([])
+      }
+    } catch (error) {
+      console.error("Error fetching comments:", error)
+      setComments([])
+    } finally {
+      setCommentsLoading(false)
+    }
+  }
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() || !selectedPostId) return
+
+    try {
+      console.log("=== SUBMIT COMMENT DEBUG ===")
+      console.log("Submitting comment for post ID:", selectedPostId)
+
+      const response = await fetch(`/api/posts/${selectedPostId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newComment.trim() }),
+      })
+
+      console.log("Comment submit response status:", response.status)
+
+      if (response.ok) {
+        const newCommentData = await response.json()
+        console.log("Comment created:", newCommentData)
+
+        setComments([newCommentData, ...comments])
+        setNewComment("")
+
+        // Update post comment count in the posts list
+        const updatedPosts = posts.map((post) =>
+          post.id === selectedPostId ? { ...post, comments: post.comments + 1 } : post,
+        )
+        setPosts(updatedPosts)
+
+        toast({
+          title: "Success",
+          description: "Comment added successfully!",
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to add comment")
+      }
+    } catch (error) {
+      console.error("Error submitting comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add comment. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   // Add delete post handler
   const handleDeletePost = async (postId: number) => {
@@ -1231,7 +1314,6 @@ export default function ProfilePage() {
                                 {user.nickname || user.username}
                               </h3>
                               <span className="text-xs text-gray-500 truncate">@{user.username}</span>
-                              <span className="text-xs text-gray-400">• Post ID: {post.id}</span>
                             </div>
                             <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">{formatDate(post.createdAt)}</p>
                           </div>
@@ -1297,10 +1379,7 @@ export default function ProfilePage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                console.log(`Commenting on post with ID: ${post.id}`)
-                                // Add your comment handling logic here
-                              }}
+                              onClick={() => handleOpenComments(post.id)}
                               className="flex items-center gap-1 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 py-1"
                             >
                               <MessageCircle className="h-3 w-3 sm:h-5 sm:w-5" />
@@ -1347,6 +1426,90 @@ export default function ProfilePage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Comments Dialog */}
+      <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
+        <DialogContent className="mx-4 sm:mx-auto sm:max-w-[500px] max-h-[80vh] overflow-hidden rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-blue-600">Comments</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col h-[60vh]">
+            {/* Comment Input */}
+            <div className="p-4 border-b">
+              <div className="flex gap-3">
+                <div className="relative h-8 w-8 overflow-hidden rounded-full flex-shrink-0">
+                  <Image
+                    src={user?.profileImage || user?.image || "/placeholder.svg?height=32&width=32"}
+                    alt="Your avatar"
+                    fill
+                    className="object-cover"
+                    sizes="32px"
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Textarea
+                    placeholder="Write a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    className="min-h-[60px] rounded-lg border-blue-200 resize-none text-sm"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSubmitComment}
+                      disabled={!newComment.trim()}
+                      size="sm"
+                      className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4"
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Comment
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {commentsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                </div>
+              ) : comments.length > 0 ? (
+                comments.map((comment) => (
+                  <div key={comment.id} className="flex gap-3">
+                    <div className="relative h-8 w-8 overflow-hidden rounded-full flex-shrink-0">
+                      <Image
+                        src={comment.user?.profileImage || comment.user?.image || "/placeholder.svg?height=32&width=32"}
+                        alt={comment.user?.username || "User"}
+                        fill
+                        className="object-cover"
+                        sizes="32px"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-gray-900">
+                          {comment.user?.nickname || comment.user?.username}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-800 leading-relaxed">{comment.content}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <MessageCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No comments yet</p>
+                  <p className="text-xs text-gray-400">Be the first to comment!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
