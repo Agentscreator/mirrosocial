@@ -88,46 +88,76 @@ export default function ProfilePage() {
     async (targetUserId: string, forceRefresh = false) => {
       try {
         setPostsLoading(true)
-        console.log(`Fetching posts for user ID: ${targetUserId}, forceRefresh: ${forceRefresh}`)
+        console.log("=== FRONTEND FETCH POSTS DEBUG START ===")
+        console.log("Target user ID:", targetUserId)
+        console.log("Force refresh:", forceRefresh)
+        console.log("Cache key:", cacheKey)
+        console.log("Current session user ID:", session?.user?.id)
 
         if (!forceRefresh) {
           const cachedPosts = sessionStorage.getItem(cacheKey)
           if (cachedPosts) {
             const parsed = JSON.parse(cachedPosts)
-            if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+            const cacheAge = Date.now() - parsed.timestamp
+            console.log("Cache found, age:", cacheAge, "ms")
+            if (cacheAge < 5 * 60 * 1000) {
               setPosts(parsed.data)
-              console.log("Posts loaded from cache")
+              console.log("✅ Posts loaded from cache:", parsed.data.length)
               setPostsLoading(false)
               return
+            } else {
+              console.log("Cache expired, fetching fresh data")
             }
+          } else {
+            console.log("No cache found")
           }
         }
 
-        const postsResponse = await fetch(`/api/posts?userId=${targetUserId}?t=${Date.now()}`)
-        console.log(`Posts API URL: /api/posts?userId=${targetUserId}?t=${Date.now()}`)
+        const apiUrl = `/api/posts?userId=${targetUserId}&t=${Date.now()}`
+        console.log("API URL:", apiUrl)
+        console.log("Making fetch request...")
+
+        const postsResponse = await fetch(apiUrl)
+        console.log("Response status:", postsResponse.status)
+        console.log("Response ok:", postsResponse.ok)
+        console.log("Response headers:", Object.fromEntries(postsResponse.headers.entries()))
+
         if (postsResponse.ok) {
           const postsData = await postsResponse.json()
-          console.log("Posts data fetched:", postsData)
+          console.log("Posts data received:", {
+            hasPostsArray: Array.isArray(postsData.posts),
+            postsCount: postsData.posts?.length || 0,
+            rawData: postsData,
+          })
+
           const newPosts = postsData.posts || []
+          console.log("Setting posts state:", newPosts.length)
           setPosts(newPosts)
 
-          sessionStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-              data: newPosts,
-              timestamp: Date.now(),
-            }),
-          )
-          console.log("Posts saved to cache")
-          console.log("Successfully fetched posts")
+          // Save to cache
+          const cacheData = {
+            data: newPosts,
+            timestamp: Date.now(),
+          }
+          sessionStorage.setItem(cacheKey, JSON.stringify(cacheData))
+          console.log("✅ Posts saved to cache")
+          console.log("✅ Successfully fetched posts:", newPosts.length)
         } else {
-          const errorData = await postsResponse.json().catch(() => ({}))
+          const errorText = await postsResponse.text()
+          console.error("❌ API Error Response:", errorText)
+          let errorData
+          try {
+            errorData = JSON.parse(errorText)
+          } catch {
+            errorData = { message: errorText }
+          }
           const errorMessage = errorData.message || "Failed to fetch posts"
-          console.error("Failed to fetch posts:", errorMessage)
+          console.error("❌ Failed to fetch posts:", errorMessage)
           throw new Error(errorMessage)
         }
       } catch (error: any) {
-        console.error("Error fetching posts:", error)
+        console.error("❌ Error fetching posts:", error)
+        console.error("Error stack:", error.stack)
         toast({
           title: "Error",
           description: "Failed to load posts. Please try again.",
@@ -135,50 +165,55 @@ export default function ProfilePage() {
         })
       } finally {
         setPostsLoading(false)
+        console.log("=== FRONTEND FETCH POSTS DEBUG END ===")
       }
     },
-    [cacheKey],
+    [cacheKey, session?.user?.id],
   )
 
   const fetchFollowers = async (targetUserId: string) => {
     try {
+      console.log("=== FETCHING FOLLOWERS DEBUG ===")
       console.log(`Fetching followers for user ID: ${targetUserId}`)
       const response = await fetch(`/api/users/${targetUserId}/followers`)
       console.log(`Followers API URL: /api/users/${targetUserId}/followers`)
+      console.log("Response status:", response.status)
       if (response.ok) {
         const data = await response.json()
         console.log("Followers data fetched:", data)
         setFollowers(data.followers || [])
-        console.log("Successfully fetched followers")
+        console.log("✅ Successfully fetched followers:", data.followers?.length || 0)
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to fetch followers"
-        console.error("Failed to fetch followers:", errorMessage)
+        console.error("❌ Failed to fetch followers:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error("Error fetching followers:", error)
+      console.error("❌ Error fetching followers:", error)
     }
   }
 
   const fetchFollowing = async (targetUserId: string) => {
     try {
+      console.log("=== FETCHING FOLLOWING DEBUG ===")
       console.log(`Fetching following for user ID: ${targetUserId}`)
       const response = await fetch(`/api/users/${targetUserId}/following`)
       console.log(`Following API URL: /api/users/${targetUserId}/following`)
+      console.log("Response status:", response.status)
       if (response.ok) {
         const data = await response.json()
         console.log("Following data fetched:", data)
         setFollowing(data.following || [])
-        console.log("Successfully fetched following")
+        console.log("✅ Successfully fetched following:", data.following?.length || 0)
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to fetch following"
-        console.error("Failed to fetch following:", errorMessage)
+        console.error("❌ Failed to fetch following:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error("Error fetching following:", error)
+      console.error("❌ Error fetching following:", error)
     }
   }
 
@@ -186,64 +221,75 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       try {
         setLoading(true)
+        console.log("=== PROFILE FETCH DEBUG START ===")
         const targetUserId = userId || session?.user?.id
+        console.log("Target user ID:", targetUserId)
+        console.log("Is own profile:", isOwnProfile)
+        console.log("Session user ID:", session?.user?.id)
 
-        if (!targetUserId) return
+        if (!targetUserId) {
+          console.log("❌ No target user ID, returning")
+          return
+        }
 
         console.log(`Fetching profile for user ID: ${targetUserId}`)
         const response = await fetch(`/api/users/profile/${targetUserId}`)
         console.log(`Profile API URL: /api/users/profile/${targetUserId}`)
+        console.log("Profile response status:", response.status)
 
         if (response.ok) {
           const data = await response.json()
           console.log("Profile data fetched:", data)
           setUser(data.user)
           setEditedAbout(data.user.about || "")
-
-          console.log("Successfully fetched profile")
+          console.log("✅ Successfully fetched profile")
         } else {
           const errorData = await response.json().catch(() => ({}))
           const errorMessage = errorData.message || "Failed to fetch profile"
-          console.error("Failed to fetch profile:", errorMessage)
+          console.error("❌ Failed to fetch profile:", errorMessage)
           throw new Error(errorMessage)
         }
 
+        console.log("Calling fetchPosts...")
         await fetchPosts(targetUserId)
 
         if (!isOwnProfile) {
+          console.log("Fetching follow status...")
           const followResponse = await fetch(`/api/users/${targetUserId}/follow-status`)
           console.log(`Follow status API URL: /api/users/${targetUserId}/follow-status`)
+          console.log("Follow status response:", followResponse.status)
           if (followResponse.ok) {
             const followData = await followResponse.json()
             console.log("Follow status data fetched:", followData)
             setIsFollowing(followData.isFollowing)
-            console.log("Successfully fetched follow status")
+            console.log("✅ Successfully fetched follow status")
           } else {
             const errorData = await followResponse.json().catch(() => ({}))
             const errorMessage = errorData.message || "Failed to fetch follow status"
-            console.error("Failed to fetch follow status:", errorMessage)
-            throw new Error(errorMessage)
+            console.error("❌ Failed to fetch follow status:", errorMessage)
           }
         }
 
         // Track visitors
         if (!isOwnProfile) {
           try {
+            console.log("Recording visitor...")
             const visitorResponse = await fetch(`/api/users/${targetUserId}/visit`, {
               method: "POST",
             })
             console.log(`Visit API URL: /api/users/${targetUserId}/visit`)
+            console.log("Visitor response status:", visitorResponse.status)
             if (visitorResponse.ok) {
-              console.log("Visitor count updated successfully")
+              console.log("✅ Visitor count updated successfully")
             } else {
-              console.error("Failed to update visitor count")
+              console.error("❌ Failed to update visitor count")
             }
           } catch (error) {
-            console.error("Error updating visitor count:", error)
+            console.error("❌ Error updating visitor count:", error)
           }
         }
       } catch (error: any) {
-        console.error("Error fetching profile:", error)
+        console.error("❌ Error fetching profile:", error)
         toast({
           title: "Error",
           description: "Failed to load profile. Please try again.",
@@ -251,11 +297,15 @@ export default function ProfilePage() {
         })
       } finally {
         setLoading(false)
+        console.log("=== PROFILE FETCH DEBUG END ===")
       }
     }
 
     if (session) {
+      console.log("Session available, fetching profile...")
       fetchProfile()
+    } else {
+      console.log("No session available")
     }
   }, [userId, session, isOwnProfile, fetchPosts])
 
@@ -264,6 +314,7 @@ export default function ProfilePage() {
       const currentCacheKey = `posts-${userId || session?.user?.id}`
       if (currentCacheKey !== cacheKey) {
         sessionStorage.removeItem(currentCacheKey)
+        console.log("Cache cleaned up:", currentCacheKey)
       }
     }
   }, [userId, session?.user?.id, cacheKey])
@@ -272,10 +323,25 @@ export default function ProfilePage() {
     if (!newPost.trim() && !imagePreview) return
 
     try {
+      console.log("=== POST SUBMIT DEBUG START ===")
       const formData = new FormData()
       formData.append("content", newPost)
       if (imageFile) {
         formData.append("image", imageFile)
+        console.log("Image file added to form data:", {
+          name: imageFile.name,
+          size: imageFile.size,
+          type: imageFile.type,
+        })
+      }
+
+      console.log("Form data contents:")
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`${key}: File(${value.name}, ${value.size} bytes)`)
+        } else {
+          console.log(`${key}: ${value}`)
+        }
       }
 
       console.log("Creating new post...")
@@ -284,13 +350,22 @@ export default function ProfilePage() {
         body: formData,
       })
       console.log("Create post API URL: /api/posts")
+      console.log("Response status:", response.status)
+      console.log("Response ok:", response.ok)
 
       if (response.ok) {
         const newPostData = await response.json()
         console.log("New post created:", newPostData)
+
+        // Clear cache to force refresh
+        sessionStorage.removeItem(cacheKey)
+        console.log("Cache cleared for fresh data")
+
         const updatedPosts = [newPostData, ...posts]
         setPosts(updatedPosts)
+        console.log("Posts state updated, new count:", updatedPosts.length)
 
+        // Save updated posts to cache
         sessionStorage.setItem(
           cacheKey,
           JSON.stringify({
@@ -298,7 +373,7 @@ export default function ProfilePage() {
             timestamp: Date.now(),
           }),
         )
-        console.log("Posts saved to cache")
+        console.log("Updated posts saved to cache")
 
         setNewPost("")
         setImageFile(null)
@@ -308,30 +383,49 @@ export default function ProfilePage() {
           title: "Success",
           description: "Post created successfully!",
         })
-        console.log("Successfully created post")
+        console.log("✅ Successfully created post")
+
+        // Force refresh posts to verify persistence
+        console.log("Force refreshing posts to verify persistence...")
+        const targetUserId = userId || session?.user?.id
+        if (targetUserId) {
+          await fetchPosts(targetUserId, true)
+        }
       } else {
-        const errorData = await response.json().catch(() => ({}))
+        const errorText = await response.text()
+        console.error("❌ API Error Response:", errorText)
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
         const errorMessage = errorData.message || "Failed to create post"
-        console.error("Failed to create post:", errorMessage)
+        console.error("❌ Failed to create post:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error: any) {
-      console.error("Error creating post:", error)
+      console.error("❌ Error creating post:", error)
+      console.error("Error stack:", error.stack)
       toast({
         title: "Error",
         description: "Failed to create post. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      console.log("=== POST SUBMIT DEBUG END ===")
     }
   }
 
   const handleLikePost = async (postId: number) => {
     try {
+      console.log("=== LIKE POST DEBUG ===")
       console.log(`Liking post with ID: ${postId}`)
       const response = await fetch(`/api/posts/${postId}/like`, {
         method: "POST",
       })
       console.log(`Like post API URL: /api/posts/${postId}/like`)
+      console.log("Like response status:", response.status)
 
       if (response.ok) {
         const updatedPost = await response.json()
@@ -349,15 +443,15 @@ export default function ProfilePage() {
           }),
         )
         console.log("Posts saved to cache")
-        console.log("Successfully liked post")
+        console.log("✅ Successfully liked post")
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to like post"
-        console.error("Failed to like post:", errorMessage)
+        console.error("❌ Failed to like post:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error("Error liking post:", error)
+      console.error("❌ Error liking post:", error)
       toast({
         title: "Error",
         description: "Failed to like post. Please try again.",
@@ -367,15 +461,29 @@ export default function ProfilePage() {
   }
 
   const handleImageChange = (file: File | null) => {
+    console.log("=== IMAGE CHANGE DEBUG ===")
+    console.log(
+      "File selected:",
+      file
+        ? {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+          }
+        : "null",
+    )
+
     setImageFile(file)
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
         setImagePreview(reader.result as string)
+        console.log("✅ Image preview set")
       }
       reader.readAsDataURL(file)
     } else {
       setImagePreview(null)
+      console.log("Image preview cleared")
     }
   }
 
@@ -403,6 +511,7 @@ export default function ProfilePage() {
 
     try {
       setProfileImageUploading(true)
+      console.log("=== PROFILE IMAGE UPLOAD DEBUG ===")
       console.log("Uploading profile image...")
 
       const formData = new FormData()
@@ -413,6 +522,7 @@ export default function ProfilePage() {
         body: formData,
       })
       console.log("Profile image API URL: /api/users/profile-image")
+      console.log("Profile image response status:", response.status)
 
       if (response.ok) {
         const data = await response.json()
@@ -438,15 +548,15 @@ export default function ProfilePage() {
           title: "Success",
           description: "Profile picture updated successfully!",
         })
-        console.log("Successfully updated profile picture")
+        console.log("✅ Successfully updated profile picture")
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to upload image"
-        console.error("Failed to upload image:", errorMessage)
+        console.error("❌ Failed to upload image:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error: any) {
-      console.error("Error uploading profile image:", error)
+      console.error("❌ Error uploading profile image:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to upload profile picture. Please try again.",
@@ -460,6 +570,7 @@ export default function ProfilePage() {
 
   const handleSaveAbout = async () => {
     try {
+      console.log("=== SAVE ABOUT DEBUG ===")
       console.log("Updating about section...")
       const response = await fetch("/api/users/profile", {
         method: "PUT",
@@ -469,6 +580,7 @@ export default function ProfilePage() {
         }),
       })
       console.log("Update about API URL: /api/users/profile")
+      console.log("About response status:", response.status)
 
       if (response.ok) {
         const data = await response.json()
@@ -480,15 +592,15 @@ export default function ProfilePage() {
           title: "Success",
           description: "About section updated successfully!",
         })
-        console.log("Successfully updated about section")
+        console.log("✅ Successfully updated about section")
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to update about section"
-        console.error("Failed to update about section:", errorMessage)
+        console.error("❌ Failed to update about section:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error("Error updating about:", error)
+      console.error("❌ Error updating about:", error)
       toast({
         title: "Error",
         description: "Failed to update about section. Please try again.",
@@ -501,11 +613,13 @@ export default function ProfilePage() {
     if (!user || isOwnProfile) return
 
     try {
+      console.log("=== FOLLOW TOGGLE DEBUG ===")
       console.log(`Toggling follow status for user ID: ${user.id}, isFollowing: ${isFollowing}`)
       const response = await fetch(`/api/users/${user.id}/follow`, {
         method: isFollowing ? "DELETE" : "POST",
       })
       console.log(`Follow toggle API URL: /api/users/${user.id}/follow`)
+      console.log("Follow toggle response status:", response.status)
 
       if (response.ok) {
         setIsFollowing(!isFollowing)
@@ -522,15 +636,15 @@ export default function ProfilePage() {
           title: "Success",
           description: isFollowing ? "Unfollowed successfully!" : "Following successfully!",
         })
-        console.log("Successfully toggled follow status")
+        console.log("✅ Successfully toggled follow status")
       } else {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || "Failed to toggle follow status"
-        console.error("Failed to toggle follow status:", errorMessage)
+        console.error("❌ Failed to toggle follow status:", errorMessage)
         throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error("Error toggling follow:", error)
+      console.error("❌ Error toggling follow:", error)
       toast({
         title: "Error",
         description: "Failed to update follow status. Please try again.",
@@ -543,6 +657,7 @@ export default function ProfilePage() {
     if (!user || isOwnProfile) return
 
     try {
+      console.log("=== MESSAGE DEBUG ===")
       console.log(`Creating message channel for user ID: ${user.id}`)
       const response = await fetch("/api/stream/channel", {
         method: "POST",
@@ -550,17 +665,19 @@ export default function ProfilePage() {
         body: JSON.stringify({ recipientId: user.id }),
       })
       console.log("Create channel API URL: /api/stream/channel")
+      console.log("Channel response status:", response.status)
 
       if (response.ok) {
         const data = await response.json()
         console.log("Channel created:", data)
         router.push(`/messages/${user.id}`)
-        console.log("Successfully created channel")
+        console.log("✅ Successfully created channel")
       } else {
+        console.log("Channel creation failed, redirecting anyway")
         router.push(`/messages/${user.id}`)
       }
     } catch (error) {
-      console.error("Error creating channel:", error)
+      console.error("❌ Error creating channel:", error)
       router.push(`/messages/${user.id}`)
     }
   }
@@ -588,6 +705,16 @@ export default function ProfilePage() {
       day: "numeric",
     })
   }
+
+  // Debug component state
+  useEffect(() => {
+    console.log("=== COMPONENT STATE DEBUG ===")
+    console.log("Posts state:", posts.length)
+    console.log("User state:", user ? { id: user.id, username: user.username } : null)
+    console.log("Loading state:", loading)
+    console.log("Posts loading state:", postsLoading)
+    console.log("Session state:", session ? { id: session.user?.id, email: session.user?.email } : null)
+  }, [posts, user, loading, postsLoading, session])
 
   if (loading) {
     return (
@@ -867,17 +994,18 @@ export default function ProfilePage() {
             value="posts"
             className="rounded-lg sm:rounded-xl data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium text-sm sm:text-base py-2"
           >
-            Posts
+            Posts ({posts.length})
             {postsLoading && <div className="ml-2 animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="posts" className="space-y-4 sm:space-y-6">
-          {/* Refresh button for posts */}
+          {/* Posts header */}
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">
               {isOwnProfile ? "Your Posts" : `${user.username}'s Posts`}
             </h2>
+            <div className="text-sm text-gray-500">Total: {posts.length}</div>
           </div>
 
           {/* Mobile-Optimized Post Creation Widget */}
@@ -988,6 +1116,7 @@ export default function ProfilePage() {
                                 {user.nickname || user.username}
                               </h3>
                               <span className="text-xs text-gray-500 truncate">@{user.username}</span>
+                              <span className="text-xs text-gray-400">• Post ID: {post.id}</span>
                             </div>
                             <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">{formatDate(post.createdAt)}</p>
                           </div>
@@ -1026,7 +1155,7 @@ export default function ProfilePage() {
                               className="flex items-center gap-1 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 py-1"
                             >
                               <MessageCircle className="h-3 w-3 sm:h-5 sm:w-5" />
-                              <span className="font-medium text-xs sm:text-sm">Comment</span>
+                              <span className="font-medium text-xs sm:text-sm">{post.comments}</span>
                             </Button>
                             <Button
                               variant="ghost"
