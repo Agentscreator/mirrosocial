@@ -252,8 +252,8 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 safe-area-inset-bottom">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
+    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
         <Button
           type="button"
           variant="ghost"
@@ -522,9 +522,7 @@ export default function MessagesPage() {
                 <div className="flex-1 overflow-hidden">
                   <MessageList />
                 </div>
-                <div className="flex-shrink-0 sticky bottom-0">
-                  <CustomMessageInput />
-                </div>
+                <CustomMessageInput />
               </Window>
               <Thread />
             </Channel>
