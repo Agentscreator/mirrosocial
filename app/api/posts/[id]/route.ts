@@ -4,6 +4,7 @@ import { authOptions } from "@/src/lib/auth"
 import { db } from "@/src/db"
 import { postsTable } from "@/src/db/schema"
 import { eq, and } from "drizzle-orm"
+import { postCommentsTable, postLikesTable } from "@/src/db/schema"
 
 // DELETE - Delete a post
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -40,7 +41,20 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     console.log("Post found, proceeding with deletion")
 
-    // Delete the post
+    // First, delete all comments associated with this post
+    console.log("Deleting associated comments...")
+    const deletedComments = await db.delete(postCommentsTable).where(eq(postCommentsTable.postId, postId)).returning()
+
+    console.log(`Deleted ${deletedComments.length} comments`)
+
+    // Then, delete all likes associated with this post
+    console.log("Deleting associated likes...")
+    const deletedLikes = await db.delete(postLikesTable).where(eq(postLikesTable.postId, postId)).returning()
+
+    console.log(`Deleted ${deletedLikes.length} likes`)
+
+    // Finally, delete the post
+    console.log("Deleting the post...")
     await db.delete(postsTable).where(and(eq(postsTable.id, postId), eq(postsTable.userId, session.user.id)))
 
     console.log("✅ Post deleted successfully")

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
 import { db } from "@/src/db"
 import { postCommentsTable, usersTable, postsTable } from "@/src/db/schema"
-import { desc, eq } from "drizzle-orm"
+import { desc, eq, and } from "drizzle-orm"
 
 // GET - Fetch comments for a post
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -133,6 +133,69 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json(commentWithUser[0])
   } catch (error) {
     console.error("Create comment error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// DELETE - Delete a comment
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    console.log("=== DELETE COMMENT API DEBUG START ===")
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      console.error("Unauthorized: No session")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await context.params
+    const postId = Number.parseInt(id)
+
+    console.log("Post ID:", postId)
+
+    if (isNaN(postId)) {
+      console.error("Invalid post ID")
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const commentId = searchParams.get("commentId")
+
+    if (!commentId) {
+      console.error("Comment ID is required")
+      return NextResponse.json({ error: "Comment ID is required" }, { status: 400 })
+    }
+
+    const commentIdNum = Number.parseInt(commentId)
+    if (isNaN(commentIdNum)) {
+      console.error("Invalid comment ID")
+      return NextResponse.json({ error: "Invalid comment ID" }, { status: 400 })
+    }
+
+    console.log("Deleting comment ID:", commentIdNum)
+
+    // Check if comment exists and belongs to the user
+    const comment = await db
+      .select()
+      .from(postCommentsTable)
+      .where(and(eq(postCommentsTable.id, commentIdNum), eq(postCommentsTable.userId, session.user.id)))
+      .limit(1)
+
+    if (comment.length === 0) {
+      console.error("Comment not found or not owned by user")
+      return NextResponse.json({ error: "Comment not found or unauthorized" }, { status: 404 })
+    }
+
+    console.log("Comment found, proceeding with deletion")
+
+    // Delete the comment
+    await db.delete(postCommentsTable).where(eq(postCommentsTable.id, commentIdNum))
+
+    console.log("✅ Comment deleted successfully")
+    console.log("=== DELETE COMMENT API DEBUG END ===")
+
+    return NextResponse.json({ message: "Comment deleted successfully" })
+  } catch (error) {
+    console.error("❌ Delete comment error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -404,6 +404,53 @@ export default function ProfilePage() {
     }
   }
 
+  // Add delete comment handler after handleSubmitComment
+  const handleDeleteComment = async (commentId: number) => {
+    if (!confirm("Are you sure you want to delete this comment?")) {
+      return
+    }
+
+    try {
+      console.log("=== DELETE COMMENT DEBUG ===")
+      console.log("Deleting comment ID:", commentId)
+
+      const response = await fetch(`/api/posts/${selectedPostId}/comments?commentId=${commentId}`, {
+        method: "DELETE",
+      })
+      console.log("Delete comment response status:", response.status)
+
+      if (response.ok) {
+        // Remove comment from state
+        const updatedComments = comments.filter((comment) => comment.id !== commentId)
+        setComments(updatedComments)
+
+        // Update post comment count in the posts list
+        const updatedPosts = posts.map((post) =>
+          post.id === selectedPostId ? { ...post, comments: Math.max(0, post.comments - 1) } : post,
+        )
+        setPosts(updatedPosts)
+
+        toast({
+          title: "Success",
+          description: "Comment deleted successfully!",
+        })
+        console.log("✅ Comment deleted successfully")
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || "Failed to delete comment"
+        console.error("❌ Failed to delete comment:", errorMessage)
+        throw new Error(errorMessage)
+      }
+    } catch (error) {
+      console.error("❌ Error deleting comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete comment. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Add delete post handler
   const handleDeletePost = async (postId: number) => {
     if (!confirm("Are you sure you want to delete this post?")) {
@@ -1476,7 +1523,7 @@ export default function ProfilePage() {
                 </div>
               ) : comments.length > 0 ? (
                 comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-3">
+                  <div key={comment.id} className="flex gap-3 group">
                     <div className="relative h-8 w-8 overflow-hidden rounded-full flex-shrink-0">
                       <Image
                         src={comment.user?.profileImage || comment.user?.image || "/placeholder.svg?height=32&width=32"}
@@ -1487,13 +1534,34 @@ export default function ProfilePage() {
                       />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-gray-900">
-                          {comment.user?.nickname || comment.user?.username}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm text-gray-900">
+                            {comment.user?.nickname || comment.user?.username}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {/* Show delete button only for own comments */}
+                        {comment.userId === session?.user?.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="h-6 w-6 rounded-full hover:bg-red-100 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete comment"
+                          >
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </Button>
+                        )}
                       </div>
                       <p className="text-sm text-gray-800 leading-relaxed">{comment.content}</p>
                     </div>
