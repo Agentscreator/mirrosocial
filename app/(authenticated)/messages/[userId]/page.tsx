@@ -46,7 +46,7 @@ const createChannelId = (userId1: string, userId2: string): string => {
 // Custom Channel Header for DM
 const DMChannelHeader = ({ otherUser, onBack }: { otherUser: any; onBack: () => void }) => {
   return (
-    <div className="flex items-center justify-between p-4 md:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+    <div className="flex items-center justify-between p-4 md:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm flex-shrink-0">
       <div className="flex items-center gap-3 md:gap-4">
         <Button
           variant="ghost"
@@ -167,8 +167,8 @@ const DMMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 safe-area-inset-bottom">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
+    <div className="p-3 md:p-4 lg:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 flex-shrink-0 w-full">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-3 lg:gap-4 w-full">
         <Button
           type="button"
           variant="ghost"
@@ -178,14 +178,14 @@ const DMMessageInput = () => {
           <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
 
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
-            className="w-full resize-none border-0 rounded-2xl md:rounded-3xl px-4 md:px-6 py-3 md:py-4 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
+            className="w-full resize-none border-0 rounded-2xl md:rounded-3xl px-3 md:px-4 lg:px-6 py-2 md:py-3 lg:py-4 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
             rows={1}
           />
         </div>
@@ -193,7 +193,7 @@ const DMMessageInput = () => {
         <Button
           type="submit"
           disabled={!text.trim()}
-          className="bg-sky-500 hover:bg-sky-600 text-white p-3 md:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
+          className="bg-sky-500 hover:bg-sky-600 text-white p-2 md:p-3 lg:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
         >
           <Send className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
@@ -247,7 +247,6 @@ export default function DirectMessagePage() {
   console.log("DirectMessagePage - Target userId:", userId)
 
   // Initialize or get existing channel
-
   useEffect(() => {
     const initializeChannel = async () => {
       if (!client || !isReady || !userId) {
@@ -409,7 +408,7 @@ export default function DirectMessagePage() {
   return (
     <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       <Chat client={client}>
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 w-full">
           <Channel channel={channel}>
             <Window>
               <DMChannelHeader otherUser={otherUser} onBack={handleBack} />
@@ -423,18 +422,28 @@ export default function DirectMessagePage() {
         </div>
       </Chat>
 
-      {/* Custom Styles - Same as the main messages page */}
+      {/* Custom Styles - Enhanced for mobile */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
             .str-chat__main-panel {
               height: 100%;
               background: linear-gradient(135deg, rgba(240, 249, 255, 0.3) 0%, rgba(255, 255, 255, 1) 50%, rgba(240, 249, 255, 0.3) 100%);
+              display: flex;
+              flex-direction: column;
             }
             
             .str-chat__message-list {
-              padding: 2rem;
+              padding: 1rem;
               background: transparent;
+              flex: 1;
+              overflow-y: auto;
+            }
+            
+            @media (min-width: 768px) {
+              .str-chat__message-list {
+                padding: 2rem;
+              }
             }
             
             .str-chat__message-list-scroll {
@@ -452,8 +461,14 @@ export default function DirectMessagePage() {
               border-radius: 1.5rem;
               padding: 1rem 1.25rem;
               box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
-              max-width: 70%;
+              max-width: 85%;
               transition: all 0.3s ease;
+            }
+
+            @media (min-width: 768px) {
+              .str-chat__message-simple__content {
+                max-width: 70%;
+              }
             }
 
             .str-chat__message-simple__content:hover {
@@ -572,13 +587,32 @@ export default function DirectMessagePage() {
               animation: fadeIn 0.6s ease-out;
             }
             
+            /* Mobile-specific fixes */
             @media (max-width: 768px) {
-              .str-chat__message-simple__content {
-                max-width: 85%;
+              .str-chat__main-panel {
+                height: 100dvh;
+                height: 100vh;
               }
               
               .str-chat__message-list {
-                padding: 1rem;
+                padding: 1rem 0.75rem;
+                padding-bottom: env(safe-area-inset-bottom, 1rem);
+              }
+              
+              /* Ensure message input is always visible on mobile */
+              .str-chat__message-input {
+                position: relative;
+                z-index: 10;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+              }
+            }
+
+            /* Prevent mobile safari from hiding the input */
+            @supports (-webkit-touch-callout: none) {
+              .str-chat__main-panel {
+                height: 100vh;
+                height: -webkit-fill-available;
               }
             }
           `,

@@ -252,8 +252,8 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 safe-area-inset-bottom">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
+    <div className="sticky bottom-0 p-3 sm:p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 z-10" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 max-w-full">
         <Button
           type="button"
           variant="ghost"
@@ -261,10 +261,10 @@ const CustomMessageInput = () => {
           className="p-2 md:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
         >
           <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
-          <span className="sr-only md:not-sr-only md:ml-1 text-xs">Media</span>
+          <span className="sr-only">Attach media</span>
         </Button>
 
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <textarea
             ref={textareaRef}
             value={text}
@@ -282,6 +282,7 @@ const CustomMessageInput = () => {
           className="bg-sky-500 hover:bg-sky-600 text-white p-3 md:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
         >
           <Send className="h-4 w-4 md:h-5 md:w-5" />
+          <span className="sr-only">Send message</span>
         </Button>
       </form>
     </div>
@@ -424,7 +425,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
+    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
       <Chat client={client}>
         {/* Sidebar - hidden on mobile when channel is active */}
         <div
@@ -504,12 +505,12 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className={cn("flex-1 flex flex-col", !activeChannel && "hidden md:flex")}>
+        <div className={cn("flex-1 flex flex-col min-h-0", !activeChannel && "hidden md:flex")}>
           {activeChannel ? (
             <Channel channel={activeChannel}>
               <Window>
                 <CustomChannelHeader onBack={() => setActiveChannel(null)} />
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden relative">
                   <MessageList />
                 </div>
                 <CustomMessageInput />
@@ -532,7 +533,7 @@ export default function MessagesPage() {
             }
             
             .str-chat__message-list {
-              padding: 2rem;
+              padding: 1rem 2rem 8rem 2rem;
               background: transparent;
             }
             
