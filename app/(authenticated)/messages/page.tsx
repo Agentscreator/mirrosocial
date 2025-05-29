@@ -252,8 +252,8 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="sticky bottom-0 p-3 sm:p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 z-10" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 max-w-full">
+    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
         <Button
           type="button"
           variant="ghost"
@@ -261,10 +261,10 @@ const CustomMessageInput = () => {
           className="p-2 md:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
         >
           <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
-          <span className="sr-only">Attach media</span>
+          <span className="sr-only md:not-sr-only md:ml-1 text-xs">Media</span>
         </Button>
 
-        <div className="flex-1 relative min-w-0">
+        <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
             value={text}
@@ -282,7 +282,6 @@ const CustomMessageInput = () => {
           className="bg-sky-500 hover:bg-sky-600 text-white p-3 md:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
         >
           <Send className="h-4 w-4 md:h-5 md:w-5" />
-          <span className="sr-only">Send message</span>
         </Button>
       </form>
     </div>
@@ -290,62 +289,72 @@ const CustomMessageInput = () => {
 }
 
 // Empty State Component
-const EmptyState = ({ router }: { router: any }) => (
+const EmptyState = () => (
   <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 relative overflow-hidden">
-    {/* Animated background elements */}
+    {/* Simple doodle elements */}
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Floating message bubbles */}
-      <div className="absolute top-1/4 left-1/4 w-16 h-10 bg-sky-100/40 rounded-2xl animate-pulse"></div>
-      <div className="absolute top-1/3 right-1/3 w-12 h-8 bg-sky-200/30 rounded-xl animate-pulse delay-300"></div>
-      <div className="absolute bottom-1/3 left-1/3 w-20 h-12 bg-sky-150/20 rounded-2xl animate-pulse delay-700"></div>
-
-      {/* Connecting lines */}
-      <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 400 400">
+      {/* Simple line doodles */}
+      <svg className="absolute top-1/4 left-1/4 w-16 h-16 text-sky-200/40" viewBox="0 0 64 64" fill="none">
         <path
-          d="M100 150 Q200 100 300 150 T500 150"
-          stroke="rgb(14 165 233)"
+          d="M8 32C8 32 16 24 32 32C48 40 56 32 56 32"
+          stroke="currentColor"
           strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <circle cx="20" cy="20" r="2" fill="currentColor" />
+        <circle cx="44" cy="44" r="1.5" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute bottom-1/3 right-1/4 w-12 h-12 text-sky-200/40" viewBox="0 0 48 48" fill="none">
+        <path
+          d="M12 24L24 12L36 24L24 36Z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="8" cy="8" r="1" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute top-1/2 right-1/3 w-10 h-10 text-sky-200/40" viewBox="0 0 40 40" fill="none">
+        <path
+          d="M8 20C8 20 12 16 20 20C28 24 32 20 32 20"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <rect x="16" y="28" width="8" height="4" rx="2" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute top-1/3 left-1/2 w-8 h-8 text-sky-200/40" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="8" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <circle cx="24" cy="8" r="1" fill="currentColor" />
+      </svg>
+
+      <svg className="absolute bottom-1/4 left-1/3 w-14 h-14 text-sky-200/40" viewBox="0 0 56 56" fill="none">
+        <path
+          d="M14 28L28 14L42 28"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           fill="none"
-          strokeDasharray="5,5"
-          className="animate-pulse"
         />
         <path
-          d="M50 250 Q150 200 250 250 T450 250"
-          stroke="rgb(14 165 233)"
+          d="M20 42C20 42 24 38 28 42C32 46 36 42 36 42"
+          stroke="currentColor"
           strokeWidth="1.5"
-          fill="none"
-          strokeDasharray="3,3"
-          className="animate-pulse delay-500"
+          strokeLinecap="round"
         />
       </svg>
     </div>
 
-    {/* Main content */}
-    <div className="text-center max-w-md relative z-10 px-6">
-      <div className="mb-8">
-        <div className="relative mx-auto w-24 h-24 mb-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-sky-400/20 to-sky-600/20 rounded-full animate-pulse"></div>
-          <div className="absolute inset-2 bg-gradient-to-br from-sky-400 to-sky-600 rounded-full flex items-center justify-center shadow-lg shadow-sky-200/50">
-            <MessageSquarePlus className="h-8 w-8 text-white" />
-          </div>
-        </div>
-        <h3 className="text-2xl font-bold text-sky-900 mb-3">Start a Conversation</h3>
-        <p className="text-sky-600 leading-relaxed mb-6">
-          Connect with friends and colleagues. Your messages will appear here once you start chatting.
-        </p>
-        <Button
-          onClick={() => router.push("/discover")}
-          className="bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white px-8 py-3 rounded-full shadow-lg shadow-sky-200/50 hover:shadow-xl hover:shadow-sky-300/50 transition-all duration-300 hover:scale-105"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Find People
-        </Button>
-      </div>
-    </div>
+    {/* Minimal content area - completely empty */}
+    <div className="text-center max-w-md relative z-10">{/* Just empty space for clean, minimal look */}</div>
 
     {/* Subtle grid pattern overlay */}
     <div
-      className="absolute inset-0 opacity-[0.02]"
+      className="absolute inset-0 opacity-[0.015]"
       style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, rgb(14 165 233) 1px, transparent 0)`,
         backgroundSize: "32px 32px",
@@ -425,7 +434,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       <Chat client={client}>
         {/* Sidebar - hidden on mobile when channel is active */}
         <div
@@ -505,12 +514,12 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className={cn("flex-1 flex flex-col min-h-0", !activeChannel && "hidden md:flex")}>
+        <div className={cn("flex-1 flex flex-col", !activeChannel && "hidden md:flex")}>
           {activeChannel ? (
             <Channel channel={activeChannel}>
               <Window>
                 <CustomChannelHeader onBack={() => setActiveChannel(null)} />
-                <div className="flex-1 overflow-hidden relative">
+                <div className="flex-1 overflow-hidden">
                   <MessageList />
                 </div>
                 <CustomMessageInput />
@@ -518,7 +527,7 @@ export default function MessagesPage() {
               <Thread />
             </Channel>
           ) : (
-            <EmptyState router={router} />
+            <EmptyState />
           )}
         </div>
       </Chat>
@@ -533,7 +542,7 @@ export default function MessagesPage() {
             }
             
             .str-chat__message-list {
-              padding: 1rem 2rem 8rem 2rem;
+              padding: 2rem;
               background: transparent;
             }
             
