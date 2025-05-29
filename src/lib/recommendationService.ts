@@ -20,6 +20,7 @@ export type RecommendedUser = {
   username: string;
   nickname?: string | null; // Changed to match database nullable field
   image: string | null;
+  profileImage?: string | null; // Added profileImage field
   tags: string[];
   similarity?: number;
   proximity?: number;
@@ -90,14 +91,34 @@ async function getPineconeRecommendations(
     },
   });
   
+  // Get additional user data from database for the matched users
+  const userIds = queryResponse.matches?.map(match => match.metadata?.userId).filter(Boolean) || [];
+  
+  const userDetails = await db
+    .select({
+      id: usersTable.id,
+      username: usersTable.username,
+      nickname: usersTable.nickname,
+      image: usersTable.image,
+      profileImage: usersTable.profileImage
+    })
+    .from(usersTable)
+    .where(sql`${usersTable.id} = ANY(${userIds})`);
+  
+  // Create a map for quick lookup
+  const userDetailsMap = new Map(userDetails.map(user => [user.id, user]));
+  
   // Process query results into recommendation format
   const results = queryResponse.matches?.map((match: ScoredPineconeRecord<RecordMetadata>) => {
     const metadata = match.metadata || {};
+    const userDetail = userDetailsMap.get(metadata.userId);
+    
     return {
       id: metadata.userId,
-      username: metadata.username || `user${metadata.userId}`,
-      nickname: metadata.nickname || null,
-      image: null, // Set default since image field doesn't exist in your schema
+      username: userDetail?.username || metadata.username || `user${metadata.userId}`,
+      nickname: userDetail?.nickname || metadata.nickname || null,
+      image: userDetail?.image || null, // Get from database
+      profileImage: userDetail?.profileImage || null, // Get from database
       tags: metadata.tags ? JSON.parse(metadata.tags) : [],
       similarity: match.score ?? 0,
       proximity: metadata.proximity || undefined,
@@ -177,12 +198,14 @@ async function getDatabaseRecommendations(
     proximityFilter = eq(usersTable.metro_area, user.metro_area);
   }
 
-  // Get potential matches
+  // Get potential matches with image fields
   const potentialMatches = await db
     .select({
       id: usersTable.id,
       username: usersTable.username,
       nickname: usersTable.nickname,
+      image: usersTable.image,
+      profileImage: usersTable.profileImage,
       dob: usersTable.dob,
       gender: usersTable.gender,
       metro_area: usersTable.metro_area
@@ -224,7 +247,8 @@ async function getDatabaseRecommendations(
       id: match.id,
       username: match.username,
       nickname: match.nickname,
-      image: null, // No image field in your schema
+      image: match.image, // Use actual image from database
+      profileImage: match.profileImage, // Use actual profileImage from database
       tags: matchTags.map(tag => tag.tagName).slice(0, 5), // Limit displayed tags
       score,
       reason: null // Will be generated later if needed

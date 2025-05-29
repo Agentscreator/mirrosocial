@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
         id: user.id,
         username: user.username,
         nickname: user.nickname,
-        image: user.profileImage || user.image
+        // Return both fields so frontend can choose the best one
+        image: user.image,
+        profileImage: user.profileImage
       })),
       success: true
     })

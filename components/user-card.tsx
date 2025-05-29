@@ -30,13 +30,18 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
   const usernameInitial = user.username.charAt(0).toUpperCase()
 
   // Debug logging
-  console.log("UserCard received user:", user)
+  console.log("UserCard received user:", user.username, "image:", user.image, "profileImage:", user.profileImage)
 
-  // Function to get the correct image URL - same as discovery page
-  const getImageUrl = (user: { image?: string | null; profileImage?: string | null }) => {
-    const result = user.profileImage || user.image || null
-    console.log("getImageUrl result:", result, "from:", { profileImage: user.profileImage, image: user.image })
-    return result
+  // Function to get the best available image URL
+  const getBestImageUrl = (user: { image?: string | null; profileImage?: string | null }): string | null => {
+    // Priority: profileImage > image > null
+    if (user.profileImage && user.profileImage.trim() && !user.profileImage.includes('placeholder')) {
+      return user.profileImage
+    }
+    if (user.image && user.image.trim() && !user.image.includes('placeholder')) {
+      return user.image
+    }
+    return null
   }
 
   const handleMessage = () => {
@@ -61,24 +66,24 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
   }
 
   const handleImageError = () => {
-    console.log("Image failed to load:", imageUrl)
+    console.log("Image failed to load for user:", user.username, "URL:", imageUrl)
     setImageError(true)
   }
 
   // Get the actual image URL to use
-  const imageUrl = getImageUrl(user)
+  const imageUrl = getBestImageUrl(user)
 
-  // Fixed fallback logic - only show fallback if:
-  // 1. Image failed to load (imageError is true), OR  
-  // 2. No image URL exists at all, OR
-  // 3. Image URL is explicitly a placeholder
-  const shouldShowFallback = imageError || !imageUrl || imageUrl.includes('placeholder.svg')
+  // Improved fallback logic: show fallback only if:
+  // 1. No image URL exists, OR
+  // 2. Image failed to load (imageError is true)
+  const shouldShowFallback = !imageUrl || imageError
 
-  console.log("Image display logic:", {
+  console.log("Image display logic for", user.username, ":", {
     imageUrl,
     imageError,
     shouldShowFallback,
-    user: user.username
+    profileImage: user.profileImage,
+    image: user.image
   })
 
   return (
@@ -98,6 +103,8 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
                 className="object-cover"
                 sizes="(max-width: 640px) 80px, 64px"
                 onError={handleImageError}
+                priority={false}
+                unoptimized={imageUrl?.startsWith('http') && !imageUrl.includes('localhost')} // Handle external URLs
               />
             )}
           </div>

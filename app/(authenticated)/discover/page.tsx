@@ -20,7 +20,7 @@ interface SearchUser {
   username: string
   nickname?: string
   image?: string
-  profileImage?: string // Add this field for the actual profile image
+  profileImage?: string
 }
 
 // Extended RecommendedUser type to include profileImage
@@ -43,24 +43,33 @@ export default function DiscoverPage() {
   const router = useRouter()
   const { client: streamClient, isReady } = useStreamContext()
 
+  // Helper function to get the best available image URL
+  const getBestImageUrl = (user: { image?: string | null; profileImage?: string | null }): string | null => {
+    // Priority: profileImage > image > null
+    if (user.profileImage && user.profileImage.trim() && !user.profileImage.includes('placeholder')) {
+      return user.profileImage
+    }
+    if (user.image && user.image.trim() && !user.image.includes('placeholder')) {
+      return user.image
+    }
+    return null
+  }
+
   // Helper function to convert API user to local user type
   const convertApiUserToLocalUser = (apiUser: ApiRecommendedUser): ExtendedRecommendedUser => {
-    console.log("Converting API user:", apiUser) // Debug log
+    console.log("Converting API user:", apiUser)
+    
+    const bestImageUrl = getBestImageUrl(apiUser as any)
+    
     return {
       id: apiUser.id,
       username: apiUser.username,
-      // Use profileImage if available, fallback to image, then to null
-      image: (apiUser as any).profileImage || apiUser.image || null,
+      image: bestImageUrl || "", // Use best image or empty string
       profileImage: (apiUser as any).profileImage,
       reason: apiUser.reason,
       tags: apiUser.tags ?? [],
       score: (apiUser as any).score ?? 0,
     }
-  }
-
-  // Function to get the correct image URL
-  const getImageUrl = (user: { image?: string | null; profileImage?: string | null }) => {
-    return user.profileImage || user.image || null
   }
 
   // Search users function
@@ -83,7 +92,15 @@ export default function DiscoverPage() {
 
       if (response.ok) {
         const { users } = await response.json();
-        setSearchResults(users);
+        console.log("Search results:", users) // Debug log
+        
+        // Process search results to ensure consistent image handling
+        const processedUsers = users.map((user: any) => ({
+          ...user,
+          image: getBestImageUrl(user) || "" // Ensure we get the best available image
+        }))
+        
+        setSearchResults(processedUsers);
         setShowSearchResults(true);
       } else {
         console.warn("Search returned status", response.status);
@@ -213,36 +230,36 @@ export default function DiscoverPage() {
     try {
       setLoadingMore(true)
       const { users: newUsers, hasMore: moreAvailable, nextPage } = await fetchRecommendations(currentPage, 2)
-const usersWithReasons = [...users]
-const existingUserIds = new Set(users.map(user => user.id))
+      const usersWithReasons = [...users]
+      const existingUserIds = new Set(users.map(user => user.id))
 
-for (const newUser of newUsers) {
-  // Skip if user already exists
-  if (existingUserIds.has(newUser.id)) {
-    continue
-  }
+      for (const newUser of newUsers) {
+        // Skip if user already exists
+        if (existingUserIds.has(newUser.id)) {
+          continue
+        }
 
-  let userId = -1
-  if (typeof newUser.id === "string") {
-    const parsed = Number.parseInt(newUser.id, 10)
-    if (!isNaN(parsed)) {
-      userId = parsed
-    }
-  } else if (typeof newUser.id === "number") {
-    userId = newUser.id
-  }
+        let userId = -1
+        if (typeof newUser.id === "string") {
+          const parsed = Number.parseInt(newUser.id, 10)
+          if (!isNaN(parsed)) {
+            userId = parsed
+          }
+        } else if (typeof newUser.id === "number") {
+          userId = newUser.id
+        }
 
-  if (userId > 0) {
-    setExplanationLoading(userId)
-  }
+        if (userId > 0) {
+          setExplanationLoading(userId)
+        }
 
-  const explanation = await generateExplanation(newUser)
-  const convertedUser = convertApiUserToLocalUser(newUser)
-  convertedUser.reason = explanation
-  usersWithReasons.push(convertedUser)
-  existingUserIds.add(newUser.id) // Add to set to track new additions
-  setExplanationLoading(-1)
-}
+        const explanation = await generateExplanation(newUser)
+        const convertedUser = convertApiUserToLocalUser(newUser)
+        convertedUser.reason = explanation
+        usersWithReasons.push(convertedUser)
+        existingUserIds.add(newUser.id) // Add to set to track new additions
+        setExplanationLoading(-1)
+      }
 
       setUsers(usersWithReasons)
       setHasMore(moreAvailable)
@@ -291,7 +308,9 @@ for (const newUser of newUsers) {
             ) : searchResults.length > 0 ? (
               <div className="py-2">
                 {searchResults.map((user) => {
-                  const imageUrl = getImageUrl(user)
+                  const imageUrl = getBestImageUrl(user)
+                  console.log("Search result image URL:", imageUrl, "for user:", user.username)
+                  
                   return (
                     <div
                       key={user.id}
@@ -306,6 +325,7 @@ for (const newUser of newUsers) {
                                 alt={user.username}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
+                                  console.log("Image failed to load:", imageUrl)
                                   // Fallback to initials if image fails to load
                                   e.currentTarget.style.display = 'none'
                                   const fallback = e.currentTarget.nextElementSibling as HTMLElement
@@ -372,16 +392,15 @@ for (const newUser of newUsers) {
           <>
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
-                console.log("Rendering user card for:", user) // Debug log
+                console.log("Rendering user card for:", user.username, "image:", user.image)
                 return (
                   <UserCard
                     key={user.id}
                     user={{
                       id: user.id,
                       username: user.username,
-                      // Don't set a placeholder - let the component handle it
-                      image: user.image || "",
-                      profileImage: user.profileImage, // Pass the actual profileImage
+                      image: user.image || "", // This should now contain the best available image
+                      profileImage: user.profileImage,
                       reason: user.reason || "Calculating why you'd be a good match...",
                       tags: user.tags || [],
                     }}
