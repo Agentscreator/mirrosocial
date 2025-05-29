@@ -167,7 +167,7 @@ const DMMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 safe-area-inset-bottom">
+    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] relative z-10">
       <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
         <Button
           type="button"
@@ -407,16 +407,16 @@ export default function DirectMessagePage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
+    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
       <Chat client={client}>
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
           <Channel channel={channel}>
             <Window>
               <DMChannelHeader otherUser={otherUser} onBack={handleBack} />
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MessageList />
               </div>
-              <div className="flex-shrink-0 sticky bottom-0">
+              <div className="flex-shrink-0 w-full">
                 <DMMessageInput />
               </div>
             </Window>
@@ -581,6 +581,43 @@ export default function DirectMessagePage() {
               
               .str-chat__message-list {
                 padding: 1rem;
+              }
+            }
+
+            /* Add these rules to the existing style block */
+            .str-chat__message-input {
+              display: block !important;
+              position: relative !important;
+              bottom: auto !important;
+              left: auto !important;
+              right: auto !important;
+              width: 100% !important;
+              z-index: 10 !important;
+            }
+
+            .str-chat__message-input-wrapper {
+              display: block !important;
+              position: relative !important;
+              width: 100% !important;
+            }
+
+            @media (max-width: 768px) {
+              .str-chat__main-panel {
+                height: 100dvh !important;
+                display: flex !important;
+                flex-direction: column !important;
+              }
+              
+              .str-chat__channel {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+              }
+              
+              .str-chat__message-list {
+                flex: 1 !important;
+                min-height: 0 !important;
+                padding: 1rem !important;
               }
             }
           `,

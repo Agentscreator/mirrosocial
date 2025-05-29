@@ -252,8 +252,8 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
+    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] relative z-10">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
         <Button
           type="button"
           variant="ghost"
@@ -434,7 +434,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
+    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30">
       <Chat client={client}>
         {/* Sidebar - hidden on mobile when channel is active */}
         <div
@@ -514,7 +514,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className={cn("flex-1 flex flex-col", !activeChannel && "hidden md:flex")}>
+        <div className={cn("flex-1 flex flex-col h-full", !activeChannel && "hidden md:flex")}>
           {activeChannel ? (
             <Channel channel={activeChannel}>
               <Window>
@@ -522,7 +522,9 @@ export default function MessagesPage() {
                 <div className="flex-1 overflow-hidden">
                   <MessageList />
                 </div>
-                <CustomMessageInput />
+                <div className="flex-shrink-0 w-full">
+                  <CustomMessageInput />
+                </div>
               </Window>
               <Thread />
             </Channel>
