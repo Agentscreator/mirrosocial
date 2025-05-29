@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
 import { StreamChat } from "stream-chat"
+import { db } from "@/src/db" // Adjust import path as needed
+import { usersTable } from "@/src/db/schema" // Adjust import path as needed
+import { eq } from "drizzle-orm"
 
 // Validate environment variables - but don't throw during build
 const STREAM_API_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY
@@ -16,6 +19,28 @@ if (STREAM_API_KEY && STREAM_SECRET_KEY) {
     serverClient = StreamChat.getInstance(STREAM_API_KEY, STREAM_SECRET_KEY)
   } catch (error) {
     console.error("Failed to initialize Stream Chat client:", error)
+  }
+}
+
+// Helper function to get user data from database
+async function getUserFromDatabase(userId: string) {
+  try {
+    const users = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        nickname: usersTable.nickname,
+        profileImage: usersTable.profileImage,
+        image: usersTable.image
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1)
+
+    return users[0] || null
+  } catch (error) {
+    console.error(`Error fetching user ${userId} from database:`, error)
+    return null
   }
 }
 
@@ -43,6 +68,24 @@ export async function POST(request: NextRequest) {
     if (typeof userId !== 'string' || userId.trim().length === 0) {
       console.error("Invalid user ID:", userId)
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 })
+    }
+
+    // Fetch user data from database and update Stream Chat user
+    try {
+      const userData = await getUserFromDatabase(userId)
+      
+      const streamUserData = {
+        id: userId,
+        name: userData?.username || userData?.nickname || session.user.name || `User_${userId.slice(-8)}`,
+        username: userData?.username || `User_${userId.slice(-8)}`,
+        image: userData?.profileImage || userData?.image || session.user.image || undefined,
+      }
+
+      // Update user in Stream Chat with database info
+      await serverClient.upsertUser(streamUserData)
+    } catch (dbError) {
+      console.error("Database error when updating Stream user:", dbError)
+      // Continue with token generation even if DB update fails
     }
 
     // Generate token with error handling

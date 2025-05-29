@@ -27,7 +27,7 @@ export default function LandingPage() {
         <section className="mx-auto max-w-4xl py-20">
           <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
             <div className="flex flex-col justify-center">
-              <h1 className="mb-6 text-4xl font-bold tracking-tight blue-text md:text-5xl">Reimagine Connect</h1>
+              <h1 className="mb-6 text-4xl font-bold tracking-tight blue-text md:text-5xl">Discover. Feel. Connect</h1>
               <p className="mb-6 text-lg premium-text-muted">
                 As humanity reaches new heights of innovation and understanding, Mirro is here to elevate how we connect. We're building a platform that stands at the peak of digital interaction — thoughtful, intelligent, and human.
               </p>

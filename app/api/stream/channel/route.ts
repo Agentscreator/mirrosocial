@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
 import { StreamChat } from "stream-chat"
+import { db } from "@/src/db" // Adjust import path as needed
+import { usersTable } from "@/src/db/schema" // Adjust import path as needed
+import { eq } from "drizzle-orm"
 import crypto from "crypto"
 
 const serverClient = StreamChat.getInstance(
@@ -23,6 +26,28 @@ function createChannelId(userId1: string, userId2: string): string {
   // Otherwise, create a hash to ensure it's under 64 characters
   const hash = crypto.createHash('md5').update(combined).digest('hex')
   return `dm_${hash}` // This will be exactly 35 characters (dm_ + 32 char hash)
+}
+
+// Helper function to get user data from database
+async function getUserFromDatabase(userId: string) {
+  try {
+    const users = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        nickname: usersTable.nickname,
+        profileImage: usersTable.profileImage,
+        image: usersTable.image
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1)
+
+    return users[0] || null
+  } catch (error) {
+    console.error(`Error fetching user ${userId} from database:`, error)
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -47,19 +72,31 @@ export async function POST(request: NextRequest) {
     console.log(`Creating channel with ID: ${channelId} (length: ${channelId.length})`)
 
     try {
-      // Ensure both users exist in Stream Chat before creating channel
+      // Fetch user data from database
+      const [currentUserData, recipientUserData] = await Promise.all([
+        getUserFromDatabase(currentUserId),
+        getUserFromDatabase(recipientId)
+      ])
+
+      // Prepare user data for Stream Chat
+      const currentUserStreamData = {
+        id: currentUserId,
+        name: currentUserData?.username || currentUserData?.nickname || session.user.name || `User_${currentUserId.slice(-8)}`,
+        username: currentUserData?.username || `User_${currentUserId.slice(-8)}`,
+        image: currentUserData?.profileImage || currentUserData?.image || session.user.image || undefined,
+      }
+
+      const recipientUserStreamData = {
+        id: recipientId,
+        name: recipientUserData?.username || recipientUserData?.nickname || `User_${recipientId.slice(-8)}`,
+        username: recipientUserData?.username || `User_${recipientId.slice(-8)}`,
+        image: recipientUserData?.profileImage || recipientUserData?.image || undefined,
+      }
+
+      // Ensure both users exist in Stream Chat with proper usernames
       await Promise.all([
-        // Create/update current user
-        serverClient.upsertUser({
-          id: currentUserId,
-          name: session.user.name || `User ${currentUserId}`,
-          image: session.user.image || undefined,
-        }),
-        // Create/update recipient user (you might want to fetch actual user data from your DB)
-        serverClient.upsertUser({
-          id: recipientId,
-          name: `User ${recipientId}`,
-        })
+        serverClient.upsertUser(currentUserStreamData),
+        serverClient.upsertUser(recipientUserStreamData)
       ])
 
       // Create or get existing channel

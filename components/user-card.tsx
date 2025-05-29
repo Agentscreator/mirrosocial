@@ -8,23 +8,25 @@ import { cn } from "@/lib/utils"
 import { AnimatedText } from "@/components/animated-text"
 import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface UserCardProps {
   user: {
     id: string | number
     username: string
     image: string
-    profileImage?: string // Add this field
+    profileImage?: string
     reason?: string
     tags: string[]
   }
-  onMessage?: () => void
+  onMessage?: (userId: string | number) => void
   onViewProfile?: () => void
   isMessaging?: boolean
 }
 
 export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }: UserCardProps) {
   const [imageError, setImageError] = useState(false)
+  const router = useRouter()
   const usernameInitial = user.username.charAt(0).toUpperCase()
 
   // Debug logging
@@ -38,8 +40,17 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
   }
 
   const handleMessage = () => {
+    console.log("Message button clicked for user:", user.id, user.username)
+    
     if (onMessage) {
-      onMessage()
+      // Call the provided onMessage callback with the user ID
+      onMessage(user.id)
+    } else {
+      // Default behavior: navigate to the message page
+      // Ensure we're using the correct user ID
+      const targetUserId = user.id
+      console.log("Navigating to message page with userId:", targetUserId)
+      router.push(`/messages/${targetUserId}`)
     }
   }
 

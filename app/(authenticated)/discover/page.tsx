@@ -213,29 +213,36 @@ export default function DiscoverPage() {
     try {
       setLoadingMore(true)
       const { users: newUsers, hasMore: moreAvailable, nextPage } = await fetchRecommendations(currentPage, 2)
-      const usersWithReasons = [...users]
+const usersWithReasons = [...users]
+const existingUserIds = new Set(users.map(user => user.id))
 
-      for (const newUser of newUsers) {
-        let userId = -1
-        if (typeof newUser.id === "string") {
-          const parsed = Number.parseInt(newUser.id, 10)
-          if (!isNaN(parsed)) {
-            userId = parsed
-          }
-        } else if (typeof newUser.id === "number") {
-          userId = newUser.id
-        }
+for (const newUser of newUsers) {
+  // Skip if user already exists
+  if (existingUserIds.has(newUser.id)) {
+    continue
+  }
 
-        if (userId > 0) {
-          setExplanationLoading(userId)
-        }
+  let userId = -1
+  if (typeof newUser.id === "string") {
+    const parsed = Number.parseInt(newUser.id, 10)
+    if (!isNaN(parsed)) {
+      userId = parsed
+    }
+  } else if (typeof newUser.id === "number") {
+    userId = newUser.id
+  }
 
-        const explanation = await generateExplanation(newUser)
-        const convertedUser = convertApiUserToLocalUser(newUser)
-        convertedUser.reason = explanation
-        usersWithReasons.push(convertedUser)
-        setExplanationLoading(-1)
-      }
+  if (userId > 0) {
+    setExplanationLoading(userId)
+  }
+
+  const explanation = await generateExplanation(newUser)
+  const convertedUser = convertApiUserToLocalUser(newUser)
+  convertedUser.reason = explanation
+  usersWithReasons.push(convertedUser)
+  existingUserIds.add(newUser.id) // Add to set to track new additions
+  setExplanationLoading(-1)
+}
 
       setUsers(usersWithReasons)
       setHasMore(moreAvailable)

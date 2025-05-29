@@ -70,11 +70,13 @@ const DMChannelHeader = ({ otherUser, onBack }: { otherUser: any; onBack: () => 
         <Avatar className="h-10 w-10 md:h-12 md:w-12 ring-2 ring-sky-100 ring-offset-2">
           <AvatarImage src={otherUser?.image || "/placeholder.svg"} />
           <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
-            {otherUser?.name?.[0]?.toUpperCase() || "?"}
+            {otherUser?.name?.[0]?.toUpperCase() || otherUser?.username?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         <div>
-          <h2 className="font-semibold text-sky-900 text-base md:text-lg">{otherUser?.name || "Unknown User"}</h2>
+          <h2 className="font-semibold text-sky-900 text-base md:text-lg">
+            {otherUser?.name || otherUser?.username || "Unknown User"}
+          </h2>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
             <p className="text-xs md:text-sm text-emerald-500 font-medium">Online</p>
@@ -250,58 +252,139 @@ export default function DirectMessagePage() {
   const params = useParams()
   const userId = params.userId as string
 
+  // Debug logging for URL params
+  console.log("DirectMessagePage - URL params:", params)
+  console.log("DirectMessagePage - Target userId:", userId)
+
   // Initialize or get existing channel
-  useEffect(() => {
-    const initializeChannel = async () => {
-      if (!client || !isReady || !userId) return
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        const currentUser = client.user
-        if (!currentUser?.id) {
-          throw new Error("Current user not found")
-        }
-
-        // Create a short, deterministic channel ID
-        const channelId = createChannelId(currentUser.id, userId)
-        
-        console.log("Creating channel with ID:", channelId, "Length:", channelId.length)
-
-        // Try to get or create the channel
-        const dmChannel = client.channel("messaging", channelId, {
-          members: [currentUser.id, userId],
-        })
-
-        // Watch the channel to get real-time updates
-        await dmChannel.watch()
-
-        // Get the other user's information
-        const members = Object.values(dmChannel.state.members || {})
-        const otherMember = members.find(member => member.user?.id !== currentUser.id)
-        
-        if (otherMember?.user) {
-          setOtherUser(otherMember.user)
-        } else {
-          // If user info is not available from channel members, create a placeholder
-          setOtherUser({
-            id: userId,
-            name: userId,
-          })
-        }
-
-        setChannel(dmChannel)
-      } catch (err) {
-        console.error("Error initializing channel:", err)
-        setError(err instanceof Error ? err.message : "Failed to load conversation")
-      } finally {
-        setLoading(false)
-      }
+  
+useEffect(() => {
+  const initializeChannel = async () => {
+    if (!client || !isReady || !userId) {
+      console.log("Missing dependencies:", { client: !!client, isReady, userId })
+      return
     }
 
-    initializeChannel()
-  }, [client, isReady, userId])
+    try {
+      setLoading(true)
+      setError(null)
+
+      const currentUser = client.user
+      if (!currentUser?.id) {
+        throw new Error("Current user not found")
+      }
+
+      console.log("Current user:", currentUser.id)
+      console.log("Target user:", userId)
+
+      // Ensure we're not trying to message ourselves
+      if (currentUser.id === userId) {
+        console.error("ERROR: Trying to message self!", { currentUserId: currentUser.id, targetUserId: userId })
+        throw new Error("Cannot message yourself")
+      }
+
+      // Create a short, deterministic channel ID
+      const channelId = createChannelId(currentUser.id, userId)
+      
+      console.log("Creating channel with ID:", channelId, "Length:", channelId.length)
+      console.log("Channel members will be:", [currentUser.id, userId])
+
+      // Try to get or create the channel
+      const dmChannel = client.channel("messaging", channelId, {
+        members: [currentUser.id, userId],
+      })
+
+      // Watch the channel to get real-time updates
+      await dmChannel.watch()
+
+      console.log("Channel state after watch:", dmChannel.state)
+      console.log("Channel members:", dmChannel.state.members)
+
+      // Get the other user's information
+      const members = Object.values(dmChannel.state.members || {})
+      console.log("All members:", members)
+      
+      const otherMember = members.find(member => member.user?.id !== currentUser.id)
+      console.log("Other member found:", otherMember)
+      
+      if (otherMember?.user) {
+        // Extract username from the name field if it follows the "User {id}" pattern
+        let displayName = otherMember.user.name || otherMember.user.username || otherMember.user.id
+        let username = otherMember.user.username || otherMember.user.name || otherMember.user.id
+        
+        // If the name follows the "User {uuid}" pattern, try to get the actual username
+        if (displayName.startsWith('User ') && displayName.length > 40) {
+          // This might be a UUID, try to fetch the actual username from your database
+          // For now, we'll use the userId to construct a more readable name
+          username = `User_${userId.slice(-8)}` // Use last 8 characters of UUID
+          displayName = username
+        }
+        
+        setOtherUser({
+          ...otherMember.user,
+          name: displayName,
+          username: username,
+          displayName: username // Add this for consistent display
+        })
+      } else {
+        // If user info is not available from channel members, try to fetch it
+        console.log("No other member found, trying to fetch user info for:", userId)
+        
+        try {
+          // Try to get user info from Stream
+          const userResponse = await client.queryUsers({ id: userId })
+          if (userResponse.users && userResponse.users.length > 0) {
+            const user = userResponse.users[0]
+            let displayName = user.name || user.username || user.id
+            let username = user.username || user.name || user.id
+            
+            // Handle the "User {uuid}" pattern
+            if (displayName.startsWith('User ') && displayName.length > 40) {
+              username = `User_${userId.slice(-8)}`
+              displayName = username
+            }
+            
+            setOtherUser({
+              ...user,
+              name: displayName,
+              username: username,
+              displayName: username
+            })
+          } else {
+            // Create a more user-friendly placeholder
+            const shortId = userId.slice(-8)
+            setOtherUser({
+              id: userId,
+              name: `User_${shortId}`,
+              username: `User_${shortId}`,
+              displayName: `User_${shortId}`
+            })
+          }
+        } catch (queryError) {
+          console.log("Could not query user, using placeholder")
+          // Create a more user-friendly placeholder
+          const shortId = userId.slice(-8)
+          setOtherUser({
+            id: userId,
+            name: `User_${shortId}`,
+            username: `User_${shortId}`,
+            displayName: `User_${shortId}`
+          })
+        }
+      }
+
+      setChannel(dmChannel)
+      console.log("Channel initialization successful")
+    } catch (err) {
+      console.error("Error initializing channel:", err)
+      setError(err instanceof Error ? err.message : "Failed to load conversation")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  initializeChannel()
+}, [client, isReady, userId])
 
   // Handle back navigation
   const handleBack = () => {
