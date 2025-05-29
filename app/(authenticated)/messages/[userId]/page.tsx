@@ -167,8 +167,8 @@ const DMMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)]">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4">
+    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 safe-area-inset-bottom">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
         <Button
           type="button"
           variant="ghost"
@@ -407,7 +407,7 @@ export default function DirectMessagePage() {
   }
 
   return (
-    <div className="flex h-[100dvh] bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-sky-50/30 via-white to-sky-50/30 overflow-hidden">
       <Chat client={client}>
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <Channel channel={channel}>
@@ -416,7 +416,7 @@ export default function DirectMessagePage() {
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MessageList />
               </div>
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 sticky bottom-0">
                 <DMMessageInput />
               </div>
             </Window>
