@@ -1,174 +1,143 @@
-// app/api/users/[userId]/follow/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/src/lib/auth';
-import { db } from '@/src/db';
-import { followersTable } from '@/src/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/src/lib/auth"
+import { db } from "@/src/db"
+import { followersTable, usersTable } from "@/src/db/schema"
+import { eq, and, count } from "drizzle-orm"
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+// POST - Follow a user
+export async function POST(request: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log("Following user...")
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      console.error("Unauthorized: No session")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { userId } = await params;
-    const currentUserId = session.user.id;
+    const { userId: followingId } = await context.params
+    const followerId = session.user.id
+
+    console.log("Following ID:", followingId)
+    console.log("Follower ID:", followerId)
 
     // Can't follow yourself
-    if (currentUserId === userId) {
-      return NextResponse.json(
-        { error: 'Cannot follow yourself' },
-        { status: 400 }
-      );
+    if (followingId === followerId) {
+      console.error("Cannot follow yourself")
+      return NextResponse.json({ error: "Cannot follow yourself" }, { status: 400 })
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(followingId)) {
+      console.error("Invalid user ID format:", followingId)
+      return NextResponse.json({ error: "Invalid user ID format" }, { status: 400 })
+    }
+
+    // Check if user to follow exists
+    const userToFollow = await db.select().from(usersTable).where(eq(usersTable.id, followingId)).limit(1)
+
+    if (userToFollow.length === 0) {
+      console.error("User to follow not found")
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
     // Check if already following
     const existingFollow = await db
       .select()
       .from(followersTable)
-      .where(
-        and(
-          eq(followersTable.followerId, currentUserId),
-          eq(followersTable.followingId, userId)
-        )
-      )
-      .limit(1);
+      .where(and(eq(followersTable.followerId, followerId), eq(followersTable.followingId, followingId)))
+      .limit(1)
 
     if (existingFollow.length > 0) {
-      return NextResponse.json(
-        { error: 'Already following this user' },
-        { status: 400 }
-      );
+      console.error("Already following this user")
+      return NextResponse.json({ error: "Already following this user" }, { status: 400 })
     }
 
-    // Follow - create the relationship
+    console.log("Creating follow relationship...")
     await db.insert(followersTable).values({
-      followerId: currentUserId,
-      followingId: userId,
-    });
+      followerId,
+      followingId,
+    })
+
+    // Get updated follower count
+    const followerCountResult = await db
+      .select({ count: count() })
+      .from(followersTable)
+      .where(eq(followersTable.followingId, followingId))
+
+    const followerCount = followerCountResult[0]?.count || 0
+    console.log("Updated follower count:", followerCount)
+
+    console.log("Follow relationship created successfully")
 
     return NextResponse.json({
-      success: true,
-      isFollowing: true,
-      message: 'Successfully followed user'
-    });
-
+      message: "User followed successfully",
+      followerCount,
+    })
   } catch (error) {
-    console.error('Error following user:', error);
-    return NextResponse.json(
-      { error: 'Failed to follow user' },
-      { status: 500 }
-    );
+    console.error("Follow user error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+// DELETE - Unfollow a user
+export async function DELETE(request: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log("Unfollowing user...")
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      console.error("Unauthorized: No session")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { userId } = await params;
-    const currentUserId = session.user.id;
+    const { userId: followingId } = await context.params
+    const followerId = session.user.id
 
-    // Can't unfollow yourself
-    if (currentUserId === userId) {
-      return NextResponse.json(
-        { error: 'Cannot unfollow yourself' },
-        { status: 400 }
-      );
+    console.log("Following ID:", followingId)
+    console.log("Follower ID:", followerId)
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(followingId)) {
+      console.error("Invalid user ID format:", followingId)
+      return NextResponse.json({ error: "Invalid user ID format" }, { status: 400 })
     }
 
-    // Check if currently following
+    // Check if follow relationship exists
     const existingFollow = await db
       .select()
       .from(followersTable)
-      .where(
-        and(
-          eq(followersTable.followerId, currentUserId),
-          eq(followersTable.followingId, userId)
-        )
-      )
-      .limit(1);
+      .where(and(eq(followersTable.followerId, followerId), eq(followersTable.followingId, followingId)))
+      .limit(1)
 
     if (existingFollow.length === 0) {
-      return NextResponse.json(
-        { error: 'Not currently following this user' },
-        { status: 400 }
-      );
+      console.error("Not following this user")
+      return NextResponse.json({ error: "Not following this user" }, { status: 400 })
     }
 
-    // Unfollow - delete the relationship
+    console.log("Removing follow relationship...")
     await db
       .delete(followersTable)
-      .where(
-        and(
-          eq(followersTable.followerId, currentUserId),
-          eq(followersTable.followingId, userId)
-        )
-      );
+      .where(and(eq(followersTable.followerId, followerId), eq(followersTable.followingId, followingId)))
 
-    return NextResponse.json({
-      success: true,
-      isFollowing: false,
-      message: 'Successfully unfollowed user'
-    });
-
-  } catch (error) {
-    console.error('Error unfollowing user:', error);
-    return NextResponse.json(
-      { error: 'Failed to unfollow user' },
-      { status: 500 }
-    );
-  }
-}
-
-// GET method to check follow status
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { userId } = await params;
-    const currentUserId = session.user.id;
-
-    if (currentUserId === userId) {
-      return NextResponse.json({ isFollowing: false });
-    }
-
-    const followingCheck = await db
-      .select()
+    // Get updated follower count
+    const followerCountResult = await db
+      .select({ count: count() })
       .from(followersTable)
-      .where(
-        and(
-          eq(followersTable.followerId, currentUserId),
-          eq(followersTable.followingId, userId)
-        )
-      )
-      .limit(1);
+      .where(eq(followersTable.followingId, followingId))
+
+    const followerCount = followerCountResult[0]?.count || 0
+    console.log("Updated follower count:", followerCount)
+
+    console.log("Follow relationship removed successfully")
 
     return NextResponse.json({
-      isFollowing: followingCheck.length > 0
-    });
-
+      message: "User unfollowed successfully",
+      followerCount,
+    })
   } catch (error) {
-    console.error('Error checking follow status:', error);
-    return NextResponse.json(
-      { error: 'Failed to check follow status' },
-      { status: 500 }
-    );
+    console.error("Unfollow user error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

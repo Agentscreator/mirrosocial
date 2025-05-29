@@ -1,71 +1,56 @@
-// app/api/users/[userId]/followers/route.ts - Fixed followers endpoint
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/src/lib/auth';
-import { db } from '@/src/db';
-import { followersTable, usersTable } from '@/src/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/src/lib/auth"
+import { db } from "@/src/db"
+import { followersTable, usersTable } from "@/src/db/schema"
+import { eq } from "drizzle-orm"
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+// GET - Get followers for a user
+export async function GET(request: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log("Fetching followers...")
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      console.error("Unauthorized: No session")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { userId } = await params;
-    const followers = await getFollowersEnhanced(userId, session.user.id);
-        
-    return NextResponse.json({ 
-      users: followers,
-      success: true 
-    });
+    const { userId } = await context.params
+    console.log("User ID:", userId)
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(userId)) {
+      console.error("Invalid user ID format:", userId)
+      return NextResponse.json({ error: "Invalid user ID format" }, { status: 400 })
+    }
+
+    // Check if user exists
+    const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1)
+
+    if (user.length === 0) {
+      console.error("User not found")
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Get followers (people who follow this user)
+    const followers = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        nickname: usersTable.nickname,
+        profileImage: usersTable.profileImage,
+        image: usersTable.image,
+      })
+      .from(followersTable)
+      .leftJoin(usersTable, eq(followersTable.followerId, usersTable.id))
+      .where(eq(followersTable.followingId, userId))
+
+    console.log(`Fetched ${followers.length} followers for user ${userId}`)
+
+    return NextResponse.json({ followers })
   } catch (error) {
-    console.error('Error fetching followers:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch followers' },
-      { status: 500 }
-    );
+    console.error("Fetch followers error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
-
-async function getFollowersEnhanced(userId: string, currentUserId: string) {
-  // Get all followers of the user
-  const followersQuery = await db
-    .select({
-      id: usersTable.id,
-      username: usersTable.username,
-      nickname: usersTable.nickname,
-      profileImage: usersTable.profileImage,
-      image: usersTable.image,
-      metro_area: usersTable.metro_area,
-    })
-    .from(followersTable)
-    .innerJoin(usersTable, eq(followersTable.followerId, usersTable.id))
-    .where(eq(followersTable.followingId, userId));
-
-  if (followersQuery.length === 0) {
-    return [];
-  }
-
-  // Get who the current user is following among these followers
-  const followerIds = followersQuery.map((f: any) => f.id);
-  const currentUserFollowing = await db
-    .select({ followingId: followersTable.followingId })
-    .from(followersTable)
-    .where(
-      and(
-        eq(followersTable.followerId, currentUserId),
-        inArray(followersTable.followingId, followerIds)
-      )
-    );
-
-  const followingSet = new Set(currentUserFollowing.map((f: any) => f.followingId));
-
-  return followersQuery.map((follower: any) => ({
-    ...follower,
-    isFollowing: followingSet.has(follower.id)
-  }));
 }
