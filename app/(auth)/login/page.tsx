@@ -30,11 +30,14 @@ export default function LoginPage() {
     setError("")
 
     try {
-      // Detect if input is email or username
-      const isEmail = formData.identifier.includes("@")
+      // Trim the identifier to remove any whitespace
+      const trimmedIdentifier = formData.identifier.trim()
+      const isEmail = trimmedIdentifier.includes("@")
      
       const result = await signIn("credentials", {
-        [isEmail ? "email" : "username"]: formData.identifier,
+        // Always pass both fields - NextAuth will use whichever one has a value
+        email: isEmail ? trimmedIdentifier : "",
+        username: isEmail ? "" : trimmedIdentifier,
         password: formData.password,
         redirect: false,
       })
@@ -84,6 +87,13 @@ export default function LoginPage() {
                 required
                 className="premium-input"
                 disabled={loading}
+                // Add onBlur to trim whitespace as user types
+                onBlur={(e) => {
+                  const trimmed = e.target.value.trim()
+                  if (trimmed !== e.target.value) {
+                    setFormData(prev => ({ ...prev, identifier: trimmed }))
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">

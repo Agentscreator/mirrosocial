@@ -2,7 +2,7 @@
 import { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db } from "../db";
+import { db, withRetry } from "../db";
 import { usersTable } from "../db/schema";
 import { eq, or } from "drizzle-orm";
 import { compare } from "bcrypt";
@@ -10,6 +10,7 @@ import { compare } from "bcrypt";
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
     CredentialsProvider({
@@ -20,69 +21,146 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.password) {
-          return null;
-        }
+        console.log("🔐 Authorization attempt started");
+        
+        try {
+          if (!credentials?.password) {
+            console.log("❌ No password provided");
+            return null;
+          }
 
-        // Check if we have either email or username
-        const { email, username, password } = credentials;
-        const identifier = email || username;
+          const { email, username, password } = credentials;
+          // Trim whitespace from inputs to handle copy-paste and typing errors
+          const identifier = (email || username)?.trim();
 
-        if (!identifier) {
-          return null;
-        }
+          if (!identifier) {
+            console.log("❌ No identifier provided after trimming");
+            return null;
+          }
 
-        // Query user by either email or username
-        const user = await db
-          .select()
-          .from(usersTable)
-          .where(
-            or(
-              eq(usersTable.email, identifier),
-              eq(usersTable.username, identifier)
+          console.log(`🔍 Looking for user with identifier: "${identifier}" (length: ${identifier.length})`);
+
+          // Debug: Let's also check what users exist that start with similar text
+          if (process.env.NODE_ENV === 'development') {
+            try {
+              const similarUsers = await db
+                .select({ username: usersTable.username, email: usersTable.email })
+                .from(usersTable)
+                .where(
+                  or(
+                    eq(usersTable.username, identifier.trim()),
+                    eq(usersTable.email, identifier.trim()),
+                    // Also check for the identifier without trimming in case DB has spaces
+                    eq(usersTable.username, identifier),
+                    eq(usersTable.email, identifier)
+                  )
+                )
+                .limit(5);
+              console.log('🔍 Similar users found:', similarUsers);
+            } catch (debugError) {
+              console.log('Debug query failed:', debugError);
+            }
+          }
+
+          // Optimized query with retry for Neon serverless
+          const queryStart = Date.now();
+          
+          const user = await withRetry(async () => {
+            return await db
+              .select({
+                id: usersTable.id,
+                email: usersTable.email,
+                username: usersTable.username,
+                password: usersTable.password,
+                image: usersTable.image,
+              })
+              .from(usersTable)
+              .where(
+                or(
+                  // Check trimmed identifier first
+                  eq(usersTable.email, identifier),
+                  eq(usersTable.username, identifier),
+                  // Also check original credentials in case DB has spaces
+                  eq(usersTable.email, email || ''),
+                  eq(usersTable.username, username || '')
+                )
+              )
+              .limit(1);
+          }, 2, 300); // 2 retries with 300ms delay
+
+          const queryTime = Date.now() - queryStart;
+          console.log(`⏱️ Database query took: ${queryTime}ms`);
+
+          if (!Array.isArray(user) || !user[0]) {
+            console.log("❌ User not found");
+            return null;
+          }
+
+          console.log(`👤 User found: ${user[0].email}`);
+
+          // Password comparison with timeout
+          const compareStart = Date.now();
+          
+          const passwordMatch = await Promise.race([
+            compare(password, user[0].password),
+            new Promise<boolean>((_, reject) => 
+              setTimeout(() => reject(new Error('Password comparison timeout')), 5000)
             )
-          )
-          .limit(1);
+          ]);
 
-        if (!user[0]) {
+          const compareTime = Date.now() - compareStart;
+          console.log(`⏱️ Password comparison took: ${compareTime}ms`);
+
+          if (!passwordMatch) {
+            console.log("❌ Password mismatch");
+            return null;
+          }
+
+          console.log("✅ Authentication successful");
+
+          return {
+            id: user[0].id.toString(),
+            email: user[0].email,
+            username: user[0].username,
+            image: user[0].image || null,
+          };
+        } catch (error) {
+          console.error("🚨 Authorization error:", error instanceof Error ? error.message : String(error));
           return null;
         }
-
-        const passwordMatch = await compare(password, user[0].password);
-
-        if (!passwordMatch) {
-          return null;
-        }
-
-        return {
-          id: user[0].id.toString(), // Ensure id is string
-          email: user[0].email,
-          username: user[0].username,
-          image: user[0].image || null,
-        };
       },
     }),
   ],
   callbacks: {
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id;
-        session.user.name = token.name;
-        session.user.email = token.email;
-        session.user.username = token.username;
-        session.user.image = token.image;
+      try {
+        if (token) {
+          session.user.id = token.id;
+          session.user.name = token.name;
+          session.user.email = token.email;
+          session.user.username = token.username;
+          session.user.image = token.image;
+        }
+        return session;
+      } catch (error) {
+        console.error("🚨 Session callback error:", error instanceof Error ? error.message : String(error));
+        return session;
       }
-      return session;
     },
     async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.username;
-        token.username = user.username;
-        token.image = user.image;
+      try {
+        if (user) {
+          token.id = user.id;
+          token.email = user.email;
+          token.name = user.username;
+          token.username = user.username;
+          token.image = user.image;
+        }
+        return token;
+      } catch (error) {
+        console.error("🚨 JWT callback error:", error instanceof Error ? error.message : String(error));
+        return token;
       }
-      return token;
     },
   },
   pages: {
@@ -90,12 +168,12 @@ export const authOptions: NextAuthOptions = {
     error: "/login",
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 };
 
-// Export the auth function that can be used in API routes
 export const auth = () => getServerSession(authOptions);
 
-// Updated TypeScript declarations
+// TypeScript declarations remain the same
 declare module "next-auth" {
   interface Session {
     user: {
