@@ -1,4 +1,3 @@
-// app/api/stream/token/route.ts
 import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
@@ -31,7 +30,7 @@ async function getUserFromDatabase(userId: string) {
         username: usersTable.username,
         nickname: usersTable.nickname,
         profileImage: usersTable.profileImage,
-        image: usersTable.image
+        image: usersTable.image,
       })
       .from(usersTable)
       .where(eq(usersTable.id, userId))
@@ -49,23 +48,26 @@ export async function POST(request: NextRequest) {
     // Check if Stream Chat is properly configured
     if (!serverClient) {
       console.error("Stream Chat client not initialized - missing environment variables")
-      return NextResponse.json({ 
-        error: "Stream Chat service unavailable",
-        details: "Configuration error"
-      }, { status: 503 })
+      return NextResponse.json(
+        {
+          error: "Stream Chat service unavailable",
+          details: "Configuration error",
+        },
+        { status: 503 },
+      )
     }
 
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       console.error("No session or user ID found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = session.user.id
-    
+
     // Validate userId format
-    if (typeof userId !== 'string' || userId.trim().length === 0) {
+    if (typeof userId !== "string" || userId.trim().length === 0) {
       console.error("Invalid user ID:", userId)
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 })
     }
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Fetch user data from database and update Stream Chat user
     try {
       const userData = await getUserFromDatabase(userId)
-      
+
       const streamUserData = {
         id: userId,
         name: userData?.username || userData?.nickname || session.user.name || `User_${userId.slice(-8)}`,
@@ -105,18 +107,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`Token generated successfully for user: ${userId}`)
     return NextResponse.json({ token, userId })
-    
   } catch (error) {
     console.error("Stream token API error:", error)
-    
+
     // More specific error handling
     if (error instanceof Error) {
-      return NextResponse.json({ 
-        error: "Failed to generate token", 
-        details: error.message 
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to generate token",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
-    
+
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -53,6 +53,9 @@ const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPr
   // Get the other participant
   const otherMember = Object.values(channel.state.members || {}).find((member) => member.user?.id !== currentUser?.id)
 
+  // Check if user is online
+  const isOnline = otherMember?.user?.online || false
+
   const lastMessage = channel.state.messages[channel.state.messages.length - 1]
   const unreadCount = channel.countUnread()
 
@@ -87,8 +90,11 @@ const CustomChannelPreview = ({ channel, setActiveChannel, watchers }: ChannelPr
             {otherMember?.user?.name?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
-        {/* Online status indicator */}
-        <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-400 border-3 border-white rounded-full shadow-sm animate-pulse"></div>
+        {isOnline ? (
+          <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-emerald-400 border-3 border-white rounded-full shadow-sm animate-pulse"></div>
+        ) : (
+          <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-gray-300 border-3 border-white rounded-full shadow-sm"></div>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -368,6 +374,17 @@ export default function MessagesPage() {
   const { client, isReady, error: streamError } = useStreamContext()
   const [activeChannel, setActiveChannel] = useState<StreamChannel | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showNewGroupModal, setShowNewGroupModal] = useState(false)
+  const [groupName, setGroupName] = useState("")
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [availableUsers, setAvailableUsers] = useState<any[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [showArchivedChats, setShowArchivedChats] = useState(false)
+  const [archivedChannels, setArchivedChannels] = useState<StreamChannel[]>([])
+  const [isLoadingArchived, setIsLoadingArchived] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const router = useRouter()
 
   // Custom setActiveChannel handler that matches the expected signature
@@ -377,6 +394,116 @@ export default function MessagesPage() {
     event?: any,
   ) => {
     setActiveChannel(newChannel || null)
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || !client) return
+
+    setIsSearching(true)
+    try {
+      // Search for messages containing the query
+      const messageResponse = await client.search(
+        { members: { $in: [client.userID || ""] } },
+        { text: { $autocomplete: searchQuery } },
+        { limit: 10 },
+      )
+
+      // Search for users matching the query
+      const userResponse = await client.queryUsers(
+        {
+          $or: [{ name: { $autocomplete: searchQuery } }, { username: { $autocomplete: searchQuery } }],
+        },
+        { id: 1 },
+        { limit: 10 },
+      )
+
+      // Combine results with proper structure
+      const results = [
+        ...messageResponse.results.map((r) => ({
+          type: "message",
+          data: {
+            ...r.message,
+            cid: r.message.cid || `${r.message.channel?.type}:${r.message.channel?.id}`,
+          },
+        })),
+        ...userResponse.users.filter((u) => u.id !== client.userID).map((u) => ({ type: "user", data: u })),
+      ]
+
+      setSearchResults(results)
+    } catch (error) {
+      console.error("Search error:", error)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const loadUsers = async () => {
+    if (!client) return
+
+    setIsLoadingUsers(true)
+    try {
+      const response = await client.queryUsers({}, { last_active: -1 }, { limit: 30 })
+      // Filter out current user
+      const filteredUsers = response.users.filter((u) => u.id !== client.userID)
+      setAvailableUsers(filteredUsers)
+    } catch (error) {
+      console.error("Error loading users:", error)
+    } finally {
+      setIsLoadingUsers(false)
+    }
+  }
+
+  const createGroup = async () => {
+    if (!client || !groupName.trim() || selectedUsers.length === 0) return
+
+    try {
+      // Create a new channel with the selected members
+      const channel = client.channel("messaging", crypto.randomUUID(), {
+        members: [...selectedUsers, client.userID || ""],
+        created_by: { id: client.userID || "" },
+      })
+
+      await channel.watch()
+      setShowNewGroupModal(false)
+      setGroupName("")
+      setSelectedUsers([])
+      handleSetActiveChannel(channel)
+    } catch (error) {
+      console.error("Error creating group:", error)
+      alert("Failed to create group. Please try again.")
+    }
+  }
+
+  const loadArchivedChats = async () => {
+    if (!client) return
+
+    setIsLoadingArchived(true)
+    try {
+      // Query all channels first
+      const filter = {
+        type: "messaging",
+        members: { $in: [client.userID || ""] },
+      }
+
+      const sort = { last_message_at: -1 as const }
+
+      const response = await client.queryChannels(filter, sort, {
+        limit: 30,
+        state: true,
+      })
+
+      // Filter for channels with archived custom data using optional chaining
+      const archived = response.filter((channel) => {
+        // Use optional chaining to safely access custom data
+        const customData = channel.data as any
+        return customData?.archived === true
+      })
+      setArchivedChannels(archived)
+    } catch (error) {
+      console.error("Error loading archived chats:", error)
+    } finally {
+      setIsLoadingArchived(false)
+    }
   }
 
   if (streamError) {
@@ -472,15 +599,27 @@ export default function MessagesPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
-                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                    <DropdownMenuItem
+                      className="text-sky-700 hover:bg-sky-50"
+                      onClick={() => {
+                        setShowNewGroupModal(true)
+                        loadUsers()
+                      }}
+                    >
                       <Users className="h-4 w-4 mr-3" />
                       New Group
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                    <DropdownMenuItem
+                      className="text-sky-700 hover:bg-sky-50"
+                      onClick={() => {
+                        setShowArchivedChats(true)
+                        loadArchivedChats()
+                      }}
+                    >
                       <Archive className="h-4 w-4 mr-3" />
                       Archived Chats
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
+                    <DropdownMenuItem className="text-sky-700 hover:bg-sky-50" onClick={() => setShowSettings(true)}>
                       <Settings className="h-4 w-4 mr-3" />
                       Settings
                     </DropdownMenuItem>
@@ -490,15 +629,27 @@ export default function MessagesPage() {
             </div>
 
             {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-sky-400" />
-              <Input
-                placeholder="Search conversations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 bg-sky-50/50 border-0 rounded-2xl h-12 placeholder:text-sky-400 focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 transition-all duration-300"
-              />
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSearch()
+              }}
+            >
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-sky-400" />
+                <Input
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 bg-sky-50/50 border-0 rounded-2xl h-12 placeholder:text-sky-400 focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 transition-all duration-300"
+                />
+                {isSearching && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+              </div>
+            </form>
           </div>
 
           {/* Channel List */}
@@ -532,208 +683,504 @@ export default function MessagesPage() {
             <EmptyState />
           )}
         </div>
-      </Chat>
+        {searchQuery && searchResults.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-sky-100/50 max-h-[60vh] overflow-y-auto">
+            <div className="p-3 border-b border-sky-100/50">
+              <h3 className="text-sm font-medium text-sky-900">Search Results</h3>
+            </div>
+            <div className="p-2">
+              {searchResults.map((result, index) => (
+                <div
+                  key={index}
+                  className="p-2 hover:bg-sky-50 rounded-lg cursor-pointer"
+                  onClick={() => {
+                    if (result.type === "message" && result.data.cid) {
+                      // Get the channel from the message's cid
+                      const channelType = result.data.cid.split(":")[0]
+                      const channelId = result.data.cid.split(":")[1]
+                      const messageChannel = client.channel(channelType, channelId)
+                      handleSetActiveChannel(messageChannel)
+                      setSearchQuery("")
+                      setSearchResults([])
+                    } else if (result.type === "user") {
+                      // Create or navigate to DM with this user
+                      router.push(`/messages/${result.data.id}`)
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={result.type === "message" ? result.data.user?.image : result.data.image} />
+                      <AvatarFallback className="bg-sky-100 text-sky-500">
+                        {result.type === "message"
+                          ? result.data.user?.name?.[0]?.toUpperCase() || "?"
+                          : result.data.name?.[0]?.toUpperCase() || "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-sky-900 truncate">
+                        {result.type === "message"
+                          ? result.data.user?.name || "Unknown"
+                          : result.data.name || "Unknown"}
+                      </p>
+                      <p className="text-xs text-sky-600 truncate">
+                        {result.type === "message" ? result.data.text : "@" + (result.data.username || result.data.id)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {showNewGroupModal && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowNewGroupModal(false)}
+          >
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-xl font-semibold text-sky-900 mb-4">Create New Group</h3>
 
-      {/* Custom Styles */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .str-chat__main-panel {
-              height: 100%;
-              background: linear-gradient(135deg, rgba(240, 249, 255, 0.3) 0%, rgba(255, 255, 255, 1) 50%, rgba(240, 249, 255, 0.3) 100%);
-            }
-            
-            .str-chat__message-list {
-              padding: 2rem;
-              background: transparent;
-            }
-            
-            .str-chat__message-list-scroll {
-              height: 100%;
-            }
-            
-            .str-chat__message-simple {
-              margin-bottom: 1.5rem;
-            }
-            
-            .str-chat__message-simple__content {
-              background: rgba(255, 255, 255, 0.95);
-              backdrop-filter: blur(20px);
-              border: 1px solid rgba(14, 165, 233, 0.1);
-              border-radius: 1.5rem;
-              padding: 1rem 1.25rem;
-              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
-              max-width: 70%;
-              transition: all 0.3s ease;
-            }
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="group-name" className="block text-sm font-medium text-sky-700 mb-1">
+                    Group Name
+                  </label>
+                  <Input
+                    id="group-name"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="Enter group name"
+                    className="w-full"
+                  />
+                </div>
 
-            .str-chat__message-simple__content:hover {
-              transform: translateY(-1px);
-              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.12), 0 2px 8px rgba(14, 165, 233, 0.08);
-            }
-            
-            .str-chat__message-simple--me .str-chat__message-simple__content {
-              background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-              color: white;
-              border: 1px solid rgba(255, 255, 255, 0.2);
-              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.25), 0 1px 4px rgba(14, 165, 233, 0.15);
-            }
+                <div>
+                  <label className="block text-sm font-medium text-sky-700 mb-1">Add Members</label>
 
-            .str-chat__message-simple--me .str-chat__message-simple__content:hover {
-              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.35), 0 2px 8px rgba(14, 165, 233, 0.25);
-            }
-            
-            .str-chat__message-simple__text {
-              font-size: 0.9rem;
-              line-height: 1.4;
-              margin: 0;
-              font-weight: 400;
-            }
-            
-            .str-chat__avatar {
-              width: 2.5rem;
-              height: 2.5rem;
-              margin-right: 0.75rem;
-              border: 2px solid rgba(14, 165, 233, 0.1);
-            }
-            
-            .str-chat__message-simple__actions {
-              display: none;
-              background: rgba(255, 255, 255, 0.95);
-              backdrop-filter: blur(20px);
-              border-radius: 0.75rem;
-              padding: 0.25rem;
-              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.1);
-            }
-            
-            .str-chat__message-simple:hover .str-chat__message-simple__actions {
-              display: flex;
-            }
-            
-            .str-chat__message-timestamp {
-              font-size: 0.75rem;
-              color: #0ea5e9;
-              margin-top: 0.5rem;
-              font-weight: 500;
-            }
-            
-            .str-chat__message-simple__status {
-              margin-top: 0.5rem;
-            }
-            
-            .str-chat__message-simple__status svg {
-              width: 1rem;
-              height: 1rem;
-              color: #0ea5e9;
-            }
-            
-            .str-chat__thread {
-              border-left: 1px solid rgba(14, 165, 233, 0.1);
-              background: rgba(255, 255, 255, 0.95);
-              backdrop-filter: blur(20px);
-            }
-            
-            .str-chat__message-list-scroll {
-              scroll-behavior: smooth;
-            }
-            
-            .str-chat__message-list-scroll::-webkit-scrollbar {
-              width: 6px;
-            }
-            
-            .str-chat__message-list-scroll::-webkit-scrollbar-track {
-              background: rgba(240, 249, 255, 0.5);
-              border-radius: 3px;
-            }
-            
-            .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
-              background: linear-gradient(135deg, #0ea5e9, #0284c7);
-              border-radius: 3px;
-            }
-            
-            .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
-              background: linear-gradient(135deg, #0284c7, #0369a1);
-            }
+                  {isLoadingUsers ? (
+                    <div className="flex justify-center p-4">
+                      <div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  ) : (
+                    <div className="max-h-60 overflow-y-auto border border-sky-100 rounded-lg">
+                      {availableUsers.map((user) => (
+                        <div key={user.id} className="flex items-center p-2 hover:bg-sky-50">
+                          <input
+                            type="checkbox"
+                            id={`user-${user.id}`}
+                            checked={selectedUsers.includes(user.id)}
+                            onChange={() => {
+                              if (selectedUsers.includes(user.id)) {
+                                setSelectedUsers((prev) => prev.filter((id) => id !== user.id))
+                              } else {
+                                setSelectedUsers((prev) => [...prev, user.id])
+                              }
+                            }}
+                            className="mr-3"
+                          />
+                          <label htmlFor={`user-${user.id}`} className="flex items-center gap-3 flex-1 cursor-pointer">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={user.image || "/placeholder.svg"} />
+                              <AvatarFallback className="bg-sky-100 text-sky-500">
+                                {user.name?.[0]?.toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{user.name || user.id}</span>
+                          </label>
+                        </div>
+                      ))}
 
-            .str-chat__channel-list {
-              background: transparent;
-            }
+                      {availableUsers.length === 0 && (
+                        <p className="text-center p-4 text-sm text-gray-500">No users found</p>
+                      )}
+                    </div>
+                  )}
 
-            .str-chat__channel-list-messenger__main {
-              background: transparent;
-            }
+                  <div className="mt-2 text-sm text-sky-600">
+                    {selectedUsers.length} {selectedUsers.length === 1 ? "member" : "members"} selected
+                  </div>
+                </div>
 
-            .str-chat__channel-preview-messenger {
-              background: transparent;
-              border: none;
-              padding: 0;
-              margin: 0;
-            }
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowNewGroupModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-sky-500 hover:bg-sky-600 text-white"
+                    disabled={!groupName.trim() || selectedUsers.length === 0}
+                    onClick={createGroup}
+                  >
+                    Create Group
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showArchivedChats && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowArchivedChats(false)}
+          >
+            <div
+              className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-semibold text-sky-900 mb-4">Archived Chats</h3>
 
-            .str-chat__channel-preview-messenger:hover {
-              background: transparent;
-            }
+              {isLoadingArchived ? (
+                <div className="flex-1 flex justify-center items-center">
+                  <div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full"></div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto">
+                  {archivedChannels.length > 0 ? (
+                    <div className="space-y-2">
+                      {archivedChannels.map((channel) => {
+                        // Get the other member for DMs
+                        const otherMember = Object.values(channel.state.members || {}).find(
+                          (member) => member.user?.id !== client?.userID,
+                        )
 
-            .str-chat__channel-preview-messenger--active {
-              background: rgba(14, 165, 233, 0.05);
-              border-radius: 1rem;
-            }
-            
-            @keyframes slideInUp {
-              from {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            
-            .str-chat__message-simple {
-              animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            }
+                        // Safely access custom data
+                        const customData = channel.data as any
+                        const channelName =
+                          customData?.name || otherMember?.user?.name || `Channel ${channel.id?.slice(-8)}` || "Unknown"
 
-            @keyframes fadeIn {
-              from {
-                opacity: 0;
-              }
-              to {
-                opacity: 1;
-              }
-            }
+                        return (
+                          <div
+                            key={channel.id}
+                            className="p-3 hover:bg-sky-50 rounded-lg cursor-pointer flex items-center justify-between"
+                            onClick={() => {
+                              // Update channel to remove archived status
+                              channel
+                                .update({
+                                  archived: false,
+                                } as any)
+                                .then(() => {
+                                  handleSetActiveChannel(channel)
+                                  setShowArchivedChats(false)
+                                })
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={otherMember?.user?.image || "/placeholder.svg"} />
+                                <AvatarFallback className="bg-sky-100 text-sky-500">
+                                  {channelName[0]?.toUpperCase() || "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium text-sky-900">{channelName}</p>
+                                <p className="text-xs text-sky-600">
+                                  Archived on {new Date(Date.now()).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button size="sm" variant="ghost" className="text-sky-500">
+                              Restore
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Archive className="h-12 w-12 text-sky-200 mx-auto mb-4" />
+                      <p className="text-sky-600">No archived chats found</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            .str-chat__message-list {
-              animation: fadeIn 0.6s ease-out;
-            }
+              <Button
+                className="mt-4 w-full bg-sky-500 hover:bg-sky-600 text-white"
+                onClick={() => setShowArchivedChats(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+        {showSettings && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowSettings(false)}
+          >
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-xl font-semibold text-sky-900 mb-4">Chat Settings</h3>
 
-            @keyframes slideInLeft {
-              from {
-                opacity: 0;
-                transform: translateX(-20px);
-              }
-              to {
-                opacity: 1;
-                transform: translateX(0);
-              }
-            }
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 hover:bg-sky-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-sky-100 rounded-full">
+                      <Volume2 className="h-5 w-5 text-sky-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sky-900">Notification Sounds</p>
+                      <p className="text-xs text-sky-600">Play sounds for new messages</p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input type="checkbox" id="notification-sounds" className="sr-only peer" defaultChecked />
+                    <label
+                      htmlFor="notification-sounds"
+                      className="block w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-sky-500 peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all cursor-pointer"
+                    ></label>
+                  </div>
+                </div>
 
-            .str-chat__channel-list {
-              animation: slideInLeft 0.5s ease-out;
-            }
-            
-            @media (max-width: 768px) {
-              .str-chat__message-simple__content {
-                max-width: 85%;
+                <div className="flex items-center justify-between p-3 hover:bg-sky-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-sky-100 rounded-full">
+                      <MessageSquarePlus className="h-5 w-5 text-sky-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sky-900">Read Receipts</p>
+                      <p className="text-xs text-sky-600">Show when messages are read</p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input type="checkbox" id="read-receipts" className="sr-only peer" defaultChecked />
+                    <label
+                      htmlFor="read-receipts"
+                      className="block w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-sky-500 peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all cursor-pointer"
+                    ></label>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 hover:bg-sky-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-sky-100 rounded-full">
+                      <Users className="h-5 w-5 text-sky-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sky-900">Online Status</p>
+                      <p className="text-xs text-sky-600">Show when you're online</p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input type="checkbox" id="online-status" className="sr-only peer" defaultChecked />
+                    <label
+                      htmlFor="online-status"
+                      className="block w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-sky-500 peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all cursor-pointer"
+                    ></label>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                className="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white"
+                onClick={() => setShowSettings(false)}
+              >
+                Save Settings
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Styles */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .str-chat__main-panel {
+                height: 100%;
+                background: linear-gradient(135deg, rgba(240, 249, 255, 0.3) 0%, rgba(255, 255, 255, 1) 50%, rgba(240, 249, 255, 0.3) 100%);
               }
               
               .str-chat__message-list {
-                padding: 1rem;
+                padding: 2rem;
+                background: transparent;
               }
-            }
-          `,
-        }}
-      />
+              
+              .str-chat__message-list-scroll {
+                height: 100%;
+              }
+              
+              .str-chat__message-simple {
+                margin-bottom: 1.5rem;
+              }
+              
+              .str-chat__message-simple__content {
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                border: 1px solid rgba(14, 165, 233, 0.1);
+                border-radius: 1.5rem;
+                padding: 1rem 1.25rem;
+                box-shadow: 0 4px 20px rgba(14, 165, 233, 0.08), 0 1px 4px rgba(14, 165, 233, 0.05);
+                max-width: 70%;
+                transition: all 0.3s ease;
+              }
+
+              .str-chat__message-simple__content:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 30px rgba(14, 165, 233, 0.12), 0 2px 8px rgba(14, 165, 233, 0.08);
+              }
+              
+              .str-chat__message-simple--me .str-chat__message-simple__content {
+                background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 4px 20px rgba(14, 165, 233, 0.25), 0 1px 4px rgba(14, 165, 233, 0.15);
+              }
+
+              .str-chat__message-simple--me .str-chat__message-simple__content:hover {
+                box-shadow: 0 8px 30px rgba(14, 165, 233, 0.35), 0 2px 8px rgba(14, 165, 233, 0.25);
+              }
+              
+              .str-chat__message-simple__text {
+                font-size: 0.9rem;
+                line-height: 1.4;
+                margin: 0;
+                font-weight: 400;
+              }
+              
+              .str-chat__avatar {
+                width: 2.5rem;
+                height: 2.5rem;
+                margin-right: 0.75rem;
+                border: 2px solid rgba(14, 165, 233, 0.1);
+              }
+              
+              .str-chat__message-simple__actions {
+                display: none;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                border-radius: 0.75rem;
+                padding: 0.25rem;
+                box-shadow: 0 4px 20px rgba(14, 165, 233, 0.1);
+              }
+              
+              .str-chat__message-simple:hover .str-chat__message-simple__actions {
+                display: flex;
+              }
+              
+              .str-chat__message-timestamp {
+                font-size: 0.75rem;
+                color: #0ea5e9;
+                margin-top: 0.5rem;
+                font-weight: 500;
+              }
+              
+              .str-chat__message-simple__status {
+                margin-top: 0.5rem;
+              }
+              
+              .str-chat__message-simple__status svg {
+                width: 1rem;
+                height: 1rem;
+                color: #0ea5e9;
+              }
+              
+              .str-chat__thread {
+                border-left: 1px solid rgba(14, 165, 233, 0.1);
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+              }
+              
+              .str-chat__message-list-scroll {
+                scroll-behavior: smooth;
+              }
+              
+              .str-chat__message-list-scroll::-webkit-scrollbar {
+                width: 6px;
+              }
+              
+              .str-chat__message-list-scroll::-webkit-scrollbar-track {
+                background: rgba(240, 249, 255, 0.5);
+                border-radius: 3px;
+              }
+              
+              .str-chat__message-list-scroll::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #0ea5e9, #0284c7);
+                border-radius: 3px;
+              }
+              
+              .str-chat__message-list-scroll::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #0284c7, #0369a1);
+              }
+
+              .str-chat__channel-list {
+                background: transparent;
+              }
+
+              .str-chat__channel-list-messenger__main {
+                background: transparent;
+              }
+
+              .str-chat__channel-preview-messenger {
+                background: transparent;
+                border: none;
+                padding: 0;
+                margin: 0;
+              }
+
+              .str-chat__channel-preview-messenger:hover {
+                background: transparent;
+              }
+
+              .str-chat__channel-preview-messenger--active {
+                background: rgba(14, 165, 233, 0.05);
+                border-radius: 1rem;
+              }
+              
+              @keyframes slideInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px) scale(0.95);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0) scale(1);
+                }
+              }
+              
+              .str-chat__message-simple {
+                animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+              }
+
+              @keyframes fadeIn {
+                from {
+                  opacity: 0;
+                }
+                to {
+                  opacity: 1;
+                }
+              }
+
+              .str-chat__message-list {
+                animation: fadeIn 0.6s ease-out;
+              }
+
+              @keyframes slideInLeft {
+                from {
+                  opacity: 0;
+                  transform: translateX(-20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateX(0);
+                }
+              }
+
+              .str-chat__channel-list {
+                animation: slideInLeft 0.5s ease-out;
+              }
+              
+              @media (max-width: 768px) {
+                .str-chat__message-simple__content {
+                  max-width: 85%;
+                }
+                
+                .str-chat__message-list {
+                  padding: 1rem;
+                }
+              }
+            `,
+          }}
+        />
+      </Chat>
     </div>
   )
 }

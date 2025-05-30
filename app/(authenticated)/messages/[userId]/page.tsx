@@ -15,6 +15,10 @@ import {
   Trash2,
   Paperclip,
   Send,
+  PhoneOff,
+  VideoOff,
+  Mic,
+  MicOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,126 +26,463 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Chat, Channel, MessageList, Thread, Window, useChannelStateContext } from "stream-chat-react"
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
+import { isCallInitiatedEvent, hasUserData } from "@/types/streamm"
 import "stream-chat-react/dist/css/v2/index.css"
 
 // Simple hash function to create deterministic short IDs
 const createChannelId = (userId1: string, userId2: string): string => {
-  // Sort user IDs to ensure consistency regardless of order
   const sortedIds = [userId1, userId2].sort()
   const combined = sortedIds.join("")
 
-  // Simple hash function
   let hash = 0
   for (let i = 0; i < combined.length; i++) {
     const char = combined.charCodeAt(i)
     hash = (hash << 5) - hash + char
-    hash = hash & hash // Convert to 32-bit integer
+    hash = hash & hash
   }
 
-  // Convert to positive hex string and ensure it's within 64 chars
   const hashStr = Math.abs(hash).toString(36)
   return `dm_${hashStr}`
 }
 
-// Custom Channel Header for DM
-const DMChannelHeader = ({ otherUser, onBack }: { otherUser: any; onBack: () => void }) => {
-  return (
-    <div className="flex items-center justify-between p-4 md:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
-      <div className="flex items-center gap-3 md:gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="p-2 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+// Call Modal Component
+const CallModal = ({
+  isOpen,
+  onClose,
+  callType,
+  otherUser,
+  isIncoming = false,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  callType: "audio" | "video"
+  otherUser: any
+  isIncoming?: boolean
+}) => {
+  const [isCallActive, setIsCallActive] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isVideoEnabled, setIsVideoEnabled] = useState(callType === "video")
+  const [callDuration, setCallDuration] = useState(0)
 
-        <Avatar className="h-10 w-10 md:h-12 md:w-12 ring-2 ring-sky-100 ring-offset-2">
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (isCallActive) {
+      interval = setInterval(() => {
+        setCallDuration((prev) => prev + 1)
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [isCallActive])
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const handleAnswer = () => {
+    setIsCallActive(true)
+    // Here you would integrate with Stream Call SDK
+    // call.join() or similar
+  }
+
+  const handleDecline = () => {
+    onClose()
+    // Here you would reject the call
+    // call.reject() or similar
+  }
+
+  const handleEndCall = () => {
+    setIsCallActive(false)
+    onClose()
+    // Here you would end the call
+    // call.leave() or similar
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+        {/* User Avatar */}
+        <Avatar className="h-32 w-32 mx-auto mb-6 ring-4 ring-white shadow-xl">
           <AvatarImage src={otherUser?.image || "/placeholder.svg"} />
-          <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
-            {otherUser?.name?.[0]?.toUpperCase() || otherUser?.username?.[0]?.toUpperCase() || "?"}
+          <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white text-4xl font-semibold">
+            {otherUser?.name?.[0]?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
-        <div>
-          <h2 className="font-semibold text-sky-900 text-base md:text-lg">
-            {otherUser?.name || otherUser?.username || "Unknown User"}
-          </h2>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-            <p className="text-xs md:text-sm text-emerald-500 font-medium">Online</p>
+
+        {/* User Name */}
+        <h3 className="text-2xl font-semibold text-gray-900 mb-2">{otherUser?.name || "Unknown User"}</h3>
+
+        {/* Call Status */}
+        <p className="text-gray-600 mb-8">
+          {isIncoming && !isCallActive && `Incoming ${callType} call...`}
+          {!isIncoming && !isCallActive && `Calling...`}
+          {isCallActive && formatDuration(callDuration)}
+        </p>
+
+        {/* Video Area (for video calls) */}
+        {callType === "video" && isCallActive && (
+          <div className="bg-gray-900 rounded-2xl h-48 mb-6 flex items-center justify-center">
+            <p className="text-white">Video call area</p>
+            {/* Here you would render the Stream Video components */}
           </div>
+        )}
+
+        {/* Call Controls */}
+        <div className="flex justify-center gap-4">
+          {isIncoming && !isCallActive && (
+            <>
+              <Button
+                onClick={handleDecline}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-4 h-16 w-16"
+              >
+                <PhoneOff className="h-6 w-6" />
+              </Button>
+              <Button
+                onClick={handleAnswer}
+                className="bg-green-500 hover:bg-green-600 text-white rounded-full p-4 h-16 w-16"
+              >
+                <Phone className="h-6 w-6" />
+              </Button>
+            </>
+          )}
+
+          {isCallActive && (
+            <>
+              <Button
+                onClick={() => setIsMuted(!isMuted)}
+                className={`${isMuted ? "bg-red-500 hover:bg-red-600" : "bg-gray-500 hover:bg-gray-600"} text-white rounded-full p-3 h-12 w-12`}
+              >
+                {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </Button>
+
+              {callType === "video" && (
+                <Button
+                  onClick={() => setIsVideoEnabled(!isVideoEnabled)}
+                  className={`${!isVideoEnabled ? "bg-red-500 hover:bg-red-600" : "bg-gray-500 hover:bg-gray-600"} text-white rounded-full p-3 h-12 w-12`}
+                >
+                  {isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                </Button>
+              )}
+
+              <Button
+                onClick={handleEndCall}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-3 h-12 w-12"
+              >
+                <PhoneOff className="h-5 w-5" />
+              </Button>
+            </>
+          )}
+
+          {!isIncoming && !isCallActive && (
+            <Button
+              onClick={handleEndCall}
+              className="bg-red-500 hover:bg-red-600 text-white rounded-full p-4 h-16 w-16"
+            >
+              <PhoneOff className="h-6 w-6" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Custom Channel Header for DM
+const DMChannelHeader = ({
+  otherUser,
+  onBack,
+  channel,
+  client,
+  showContactInfo,
+  setShowContactInfo,
+  router,
+}: {
+  otherUser: any
+  onBack: () => void
+  channel: StreamChannel | null
+  client: any
+  showContactInfo: boolean
+  setShowContactInfo: (value: boolean | ((prev: boolean) => boolean)) => void
+  router: any
+}) => {
+  const [callModal, setCallModal] = useState<{
+    isOpen: boolean
+    callType: "audio" | "video"
+    isIncoming: boolean
+  }>({
+    isOpen: false,
+    callType: "audio",
+    isIncoming: false,
+  })
+
+  const initiateCall = async (callType: "audio" | "video") => {
+    if (!channel || !client) return
+
+    try {
+      // Send call initiation event through Stream Chat
+      await channel.sendEvent({
+        type: "message.new", // Use a supported event type
+        call_initiated: true,
+        call_type: callType,
+        target_user: otherUser?.id,
+      } as any)
+
+      // Open call modal
+      setCallModal({
+        isOpen: true,
+        callType,
+        isIncoming: false,
+      })
+
+      // Here you would integrate with Stream Call SDK
+      // const call = client.call('default', `call_${channel.id}`)
+      // await call.getOrCreate({
+      //   data: {
+      //     created_by_id: client.userID,
+      //     members: [{ user_id: client.userID }, { user_id: otherUser.id }],
+      //   },
+      // })
+      // await call.join({ create: true })
+    } catch (error) {
+      console.error("Error initiating call:", error)
+      alert("Failed to start call. Please try again.")
+    }
+  }
+
+  // Listen for incoming calls
+  useEffect(() => {
+    if (!channel) return
+
+    const handleCallEvent = (event: any) => {
+      // Use type guards to check if this is a call initiation event
+      if (isCallInitiatedEvent(event) && hasUserData(event) && event.user.id !== client?.user?.id) {
+        setCallModal({
+          isOpen: true,
+          callType: (event as any).call_type || "audio",
+          isIncoming: true,
+        })
+      }
+    }
+
+    // Listen for message events that might contain call data
+    channel.on("message.new" as any, handleCallEvent)
+
+    return () => {
+      channel.off("message.new" as any, handleCallEvent)
+    }
+  }, [channel, client])
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-4 md:p-6 bg-white/95 backdrop-blur-xl border-b border-sky-100/50 shadow-sm">
+        <div className="flex items-center gap-3 md:gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+
+          <Avatar className="h-10 w-10 md:h-12 md:w-12 ring-2 ring-sky-100 ring-offset-2">
+            <AvatarImage src={otherUser?.image || "/placeholder.svg"} />
+            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold">
+              {otherUser?.name?.[0]?.toUpperCase() || otherUser?.username?.[0]?.toUpperCase() || "?"}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h2 className="font-semibold text-sky-900 text-base md:text-lg">
+              {otherUser?.name || otherUser?.username || "Unknown User"}
+            </h2>
+            <div className="flex items-center gap-2">
+              {otherUser?.online ? (
+                <>
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <p className="text-xs md:text-sm text-emerald-500 font-medium">Online</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                  <p className="text-xs md:text-sm text-gray-500 font-medium">Offline</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 md:gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            onClick={() => initiateCall("audio")}
+          >
+            <Phone className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+            onClick={() => initiateCall("video")}
+          >
+            <Video className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
+              >
+                <MoreVertical className="h-4 w-4 md:h-5 md:w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
+              <DropdownMenuItem
+                className="text-sky-700 hover:bg-sky-50"
+                onClick={() => setShowContactInfo((prev: boolean) => !prev)}
+              >
+                <Info className="h-4 w-4 mr-3" />
+                {showContactInfo ? "Hide Contact Info" : "Show Contact Info"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-sky-700 hover:bg-sky-50"
+                onClick={() => {
+                  if (channel) {
+                    const isMuted = channel.muteStatus().muted
+                    if (isMuted) {
+                      channel.unmute()
+                      alert("Notifications unmuted")
+                    } else {
+                      channel.mute()
+                      alert("Notifications muted")
+                    }
+                  }
+                }}
+              >
+                <Volume2 className="h-4 w-4 mr-3" />
+                Mute Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-sky-700 hover:bg-sky-50"
+                onClick={async () => {
+                  if (channel) {
+                    // Store pinned status in custom data
+                    await channel.update({
+                      pinned: true,
+                      pinned_at: new Date().toISOString(),
+                      pinned_by: client.user?.id,
+                    } as any)
+                    alert("Chat pinned")
+                  }
+                }}
+              >
+                <Pin className="h-4 w-4 mr-3" />
+                Pin Chat
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-sky-700 hover:bg-sky-50"
+                onClick={async () => {
+                  if (channel) {
+                    // Store archived status in custom data
+                    await channel.update({
+                      archived: true,
+                      archived_at: new Date().toISOString(),
+                    } as any)
+                    alert("Chat archived")
+                    router.push("/messages")
+                  }
+                }}
+              >
+                <Archive className="h-4 w-4 mr-3" />
+                Archive Chat
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-500 hover:bg-red-50"
+                onClick={() => {
+                  if (channel && confirm("Are you sure you want to delete this chat?")) {
+                    channel.delete().then(() => {
+                      alert("Chat deleted")
+                      router.push("/messages")
+                    })
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-3" />
+                Delete Chat
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="flex items-center gap-1 md:gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
-        >
-          <Phone className="h-4 w-4 md:h-5 md:w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
-        >
-          <Video className="h-4 w-4 md:h-5 md:w-5" />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 md:p-3 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200"
-            >
-              <MoreVertical className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-xl border-sky-100/50 shadow-xl">
-            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
-              <Info className="h-4 w-4 mr-3" />
-              Contact Info
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
-              <Volume2 className="h-4 w-4 mr-3" />
-              Mute Notifications
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
-              <Pin className="h-4 w-4 mr-3" />
-              Pin Chat
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-sky-700 hover:bg-sky-50">
-              <Archive className="h-4 w-4 mr-3" />
-              Archive Chat
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-500 hover:bg-red-50">
-              <Trash2 className="h-4 w-4 mr-3" />
-              Delete Chat
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+      {/* Call Modal */}
+      <CallModal
+        isOpen={callModal.isOpen}
+        onClose={() => setCallModal((prev) => ({ ...prev, isOpen: false }))}
+        callType={callModal.callType}
+        otherUser={otherUser}
+        isIncoming={callModal.isIncoming}
+      />
+    </>
   )
 }
 
 // Custom Message Input for DM
 const DMMessageInput = () => {
   const [text, setText] = useState("")
+  const [attachments, setAttachments] = useState<File[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { channel } = useChannelStateContext()
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files)
+      setAttachments((prev) => [...prev, ...newFiles])
+    }
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!text.trim() || !channel) return
+    if ((!text.trim() && attachments.length === 0) || !channel) return
 
     try {
-      await channel.sendMessage({
+      const messageData: any = {
         text: text.trim(),
-      })
+      }
+
+      if (attachments.length > 0) {
+        const streamAttachments = await Promise.all(
+          attachments.map(async (file) => {
+            const isImage = file.type.startsWith("image/")
+
+            return {
+              type: file.type,
+              title: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+              asset_url: URL.createObjectURL(file),
+              image_url: isImage ? URL.createObjectURL(file) : undefined,
+            }
+          }),
+        )
+
+        messageData.attachments = streamAttachments
+      }
+
+      await channel.sendMessage(messageData)
+
       setText("")
+      setAttachments([])
     } catch (error) {
       console.error("Error sending message:", error)
     }
@@ -169,14 +510,18 @@ const DMMessageInput = () => {
   return (
     <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] relative z-10">
       <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="p-2 md:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
-        >
-          <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
-        </Button>
+        <div>
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="p-2 md:p-3 mb-1 hover:bg-sky-50 text-sky-600 rounded-full transition-all duration-200 flex-shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+        </div>
 
         <div className="flex-1 relative">
           <textarea
@@ -188,11 +533,40 @@ const DMMessageInput = () => {
             className="w-full resize-none border-0 rounded-2xl md:rounded-3xl px-3 md:px-6 py-2 md:py-4 text-sm bg-sky-50/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300/50 focus:bg-white/80 max-h-[120px] placeholder:text-sky-400 transition-all duration-300"
             rows={1}
           />
+
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {attachments.map((file, index) => (
+                <div key={index} className="relative bg-white rounded-lg p-1 border border-sky-100 shadow-sm">
+                  <div className="flex items-center gap-2 max-w-[150px]">
+                    {file.type.startsWith("image/") ? (
+                      <img
+                        src={URL.createObjectURL(file) || "/placeholder.svg"}
+                        alt={file.name}
+                        className="h-10 w-10 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 bg-sky-100 rounded flex items-center justify-center">
+                        <Paperclip className="h-4 w-4 text-sky-500" />
+                      </div>
+                    )}
+                    <span className="text-xs truncate">{file.name}</span>
+                  </div>
+                  <button
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center"
+                    onClick={() => removeAttachment(index)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <Button
           type="submit"
-          disabled={!text.trim()}
+          disabled={!text.trim() && attachments.length === 0}
           className="bg-sky-500 hover:bg-sky-600 text-white p-2 md:p-4 rounded-full mb-1 disabled:opacity-30 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 flex-shrink-0"
         >
           <Send className="h-4 w-4 md:h-5 md:w-5" />
@@ -238,20 +612,15 @@ export default function DirectMessagePage() {
   const [otherUser, setOtherUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showContactInfo, setShowContactInfo] = useState(false)
   const router = useRouter()
   const params = useParams()
   const userId = params.userId as string
 
-  // Debug logging for URL params
-  console.log("DirectMessagePage - URL params:", params)
-  console.log("DirectMessagePage - Target userId:", userId)
-
-  // Initialize or get existing channel
-
+  // Initialize channel logic remains the same...
   useEffect(() => {
     const initializeChannel = async () => {
       if (!client || !isReady || !userId) {
-        console.log("Missing dependencies:", { client: !!client, isReady, userId })
         return
       }
 
@@ -264,49 +633,26 @@ export default function DirectMessagePage() {
           throw new Error("Current user not found")
         }
 
-        console.log("Current user:", currentUser.id)
-        console.log("Target user:", userId)
-
-        // Ensure we're not trying to message ourselves
         if (currentUser.id === userId) {
-          console.error("ERROR: Trying to message self!", { currentUserId: currentUser.id, targetUserId: userId })
           throw new Error("Cannot message yourself")
         }
 
-        // Create a short, deterministic channel ID
         const channelId = createChannelId(currentUser.id, userId)
-
-        console.log("Creating channel with ID:", channelId, "Length:", channelId.length)
-        console.log("Channel members will be:", [currentUser.id, userId])
-
-        // Try to get or create the channel
         const dmChannel = client.channel("messaging", channelId, {
           members: [currentUser.id, userId],
         })
 
-        // Watch the channel to get real-time updates
         await dmChannel.watch()
 
-        console.log("Channel state after watch:", dmChannel.state)
-        console.log("Channel members:", dmChannel.state.members)
-
-        // Get the other user's information
         const members = Object.values(dmChannel.state.members || {})
-        console.log("All members:", members)
-
         const otherMember = members.find((member) => member.user?.id !== currentUser.id)
-        console.log("Other member found:", otherMember)
 
         if (otherMember?.user) {
-          // Extract username from the name field if it follows the "User {id}" pattern
           let displayName = otherMember.user.name || otherMember.user.username || otherMember.user.id
           let username = otherMember.user.username || otherMember.user.name || otherMember.user.id
 
-          // If the name follows the "User {uuid}" pattern, try to get the actual username
           if (displayName.startsWith("User ") && displayName.length > 40) {
-            // This might be a UUID, try to fetch the actual username from your database
-            // For now, we'll use the userId to construct a more readable name
-            username = `User_${userId.slice(-8)}` // Use last 8 characters of UUID
+            username = `User_${userId.slice(-8)}`
             displayName = username
           }
 
@@ -314,21 +660,16 @@ export default function DirectMessagePage() {
             ...otherMember.user,
             name: displayName,
             username: username,
-            displayName: username, // Add this for consistent display
+            displayName: username,
           })
         } else {
-          // If user info is not available from channel members, try to fetch it
-          console.log("No other member found, trying to fetch user info for:", userId)
-
           try {
-            // Try to get user info from Stream
             const userResponse = await client.queryUsers({ id: userId })
             if (userResponse.users && userResponse.users.length > 0) {
               const user = userResponse.users[0]
               let displayName = user.name || user.username || user.id
               let username = user.username || user.name || user.id
 
-              // Handle the "User {uuid}" pattern
               if (displayName.startsWith("User ") && displayName.length > 40) {
                 username = `User_${userId.slice(-8)}`
                 displayName = username
@@ -341,7 +682,6 @@ export default function DirectMessagePage() {
                 displayName: username,
               })
             } else {
-              // Create a more user-friendly placeholder
               const shortId = userId.slice(-8)
               setOtherUser({
                 id: userId,
@@ -351,8 +691,6 @@ export default function DirectMessagePage() {
               })
             }
           } catch (queryError) {
-            console.log("Could not query user, using placeholder")
-            // Create a more user-friendly placeholder
             const shortId = userId.slice(-8)
             setOtherUser({
               id: userId,
@@ -364,7 +702,6 @@ export default function DirectMessagePage() {
         }
 
         setChannel(dmChannel)
-        console.log("Channel initialization successful")
       } catch (err) {
         console.error("Error initializing channel:", err)
         setError(err instanceof Error ? err.message : "Failed to load conversation")
@@ -376,32 +713,26 @@ export default function DirectMessagePage() {
     initializeChannel()
   }, [client, isReady, userId])
 
-  // Handle back navigation
   const handleBack = () => {
     router.push("/messages")
   }
 
-  // Handle retry
   const handleRetry = () => {
     window.location.reload()
   }
 
-  // Show error if Stream is not available
   if (streamError) {
     return <ErrorState error={streamError} onRetry={handleRetry} />
   }
 
-  // Show loading if client is not ready
   if (!client || !isReady || loading) {
     return <LoadingState />
   }
 
-  // Show error if there's an initialization error
   if (error) {
     return <ErrorState error={error} onRetry={handleRetry} />
   }
 
-  // Show error if channel or user is not found
   if (!channel || !otherUser) {
     return <ErrorState error="Unable to load conversation" onRetry={handleRetry} />
   }
@@ -412,7 +743,15 @@ export default function DirectMessagePage() {
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           <Channel channel={channel}>
             <Window>
-              <DMChannelHeader otherUser={otherUser} onBack={handleBack} />
+              <DMChannelHeader
+                otherUser={otherUser}
+                onBack={handleBack}
+                channel={channel}
+                client={client}
+                showContactInfo={showContactInfo}
+                setShowContactInfo={setShowContactInfo}
+                router={router}
+              />
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MessageList />
               </div>
@@ -425,7 +764,39 @@ export default function DirectMessagePage() {
         </div>
       </Chat>
 
-      {/* Custom Styles - Same as the main messages page */}
+      {showContactInfo && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowContactInfo(false)}
+        >
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-semibold text-sky-900 mb-4">Contact Information</h3>
+            <div className="flex items-center gap-4 mb-6">
+              <Avatar className="h-16 w-16 ring-2 ring-sky-100 ring-offset-2">
+                <AvatarImage src={otherUser?.image || "/placeholder.svg"} />
+                <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-500 text-white font-semibold text-lg">
+                  {otherUser?.name?.[0]?.toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h4 className="font-semibold text-sky-900">{otherUser?.name || "Unknown User"}</h4>
+                <p className="text-sm text-sky-600">@{otherUser?.username || otherUser?.id?.slice(-8)}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">For privacy reasons, detailed contact information is hidden.</p>
+              <Button
+                className="w-full bg-sky-500 hover:bg-sky-600 text-white"
+                onClick={() => setShowContactInfo(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Styles */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -460,9 +831,9 @@ export default function DirectMessagePage() {
 
             .str-chat__message-simple__content:hover {
               transform: translateY(-1px);
-              box-shadow: 0 8px 30px rgba(14, 165, 233, 0.12), 0 2px 8px rgba(14, 165, 233, 0.08);
+
             }
-            
+
             .str-chat__message-simple--me .str-chat__message-simple__content {
               background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
               color: white;
@@ -582,9 +953,22 @@ export default function DirectMessagePage() {
               .str-chat__message-list {
                 padding: 1rem;
               }
+              
+              .str-chat__message-input {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 50 !important;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+              }
+              
+              .str-chat__message-list {
+                padding-bottom: 80px !important;
+              }
             }
 
-            /* Add these rules to the existing style block */
             .str-chat__message-input {
               display: block !important;
               position: relative !important;
