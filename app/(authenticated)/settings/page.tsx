@@ -1,3 +1,4 @@
+//app/(authenticated)/settings/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -23,8 +24,7 @@ interface UserData {
   email: string
   about?: string
   metro_area: string
-  gender?: string // Added gender field
-  age?: number // Added age field
+  gender?: string
   genderPreference: string
   preferredAgeMin: number
   preferredAgeMax: number
@@ -68,13 +68,12 @@ export default function SettingsPage() {
   const [availableTags, setAvailableTags] = useState<TagSelectorCompatibleTag[]>([])
   const [notifications, setNotifications] = useState(true)
 
-  // Form state
+  // Form state (removed age)
   const [formData, setFormData] = useState({
     nickname: "",
     gender: "",
-    age: 13, // Changed from 18 to 13
     genderPreference: "no-preference",
-    preferredAgeMin: 13, // Changed from 18 to 13
+    preferredAgeMin: 13,
     preferredAgeMax: 40,
     proximity: "local",
   })
@@ -98,7 +97,8 @@ export default function SettingsPage() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`/api/users/${session?.user?.id}?includeTags=true`)
+      // Use the new settings endpoint
+      const response = await fetch('/api/users/settings')
       if (!response.ok) throw new Error("Failed to fetch user data")
 
       const data = await response.json()
@@ -107,11 +107,10 @@ export default function SettingsPage() {
         setUserData(data.user)
         setUserTags(data.tags || [])
 
-        // Set form data
+        // Set form data with proper defaults (removed age)
         setFormData({
           nickname: data.user.nickname || "",
           gender: data.user.gender || "",
-          age: data.user.age || 13,
           genderPreference: data.user.genderPreference || "no-preference",
           preferredAgeMin: data.user.preferredAgeMin || 13,
           preferredAgeMax: data.user.preferredAgeMax || 40,
@@ -202,20 +201,10 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
-      // Validate age
-      if (formData.age < 13 || formData.age > 100) {
-        toast({
-          title: "Error",
-          description: "Age must be between 13 and 100",
-          variant: "destructive",
-        })
-        setSaving(false)
-        return
-      }
-
       const allTagIds = [...interestTags, ...contextTags, ...intentionTags]
 
-      const response = await fetch("/api/users/update", {
+      // Use the new settings endpoint
+      const response = await fetch("/api/users/settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -226,13 +215,16 @@ export default function SettingsPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to update profile")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update profile")
+      }
 
       const data = await response.json()
       if (data.success) {
         toast({
           title: "Success",
-          description: "Profile updated successfully",
+          description: "Settings updated successfully",
         })
         // Refresh user data
         await fetchUserData()
@@ -241,7 +233,7 @@ export default function SettingsPage() {
       console.error("Error updating profile:", error)
       toast({
         title: "Error",
-        description: "Failed to update profile",
+        description: error instanceof Error ? error.message : "Failed to update settings",
         variant: "destructive",
       })
     } finally {
@@ -312,20 +304,6 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="age">Age</Label>
-              <Input
-                id="age"
-                type="number"
-                min="13"
-                max="100"
-                value={formData.age}
-                onChange={(e) => handleInputChange("age", Number.parseInt(e.target.value) || 13)}
-                className="premium-input"
-              />
-              <p className="text-xs text-muted-foreground">Must be between 13 and 100</p>
             </div>
           </CardContent>
         </Card>
