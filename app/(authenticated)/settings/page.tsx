@@ -23,6 +23,8 @@ interface UserData {
   email: string
   about?: string
   metro_area: string
+  gender?: string // Added gender field
+  age?: number // Added age field
   genderPreference: string
   preferredAgeMin: number
   preferredAgeMax: number
@@ -41,11 +43,18 @@ interface Tag {
   id: string
   name: string
   category: string
-  color: string // Added the missing color property
+  color: string
 }
 
-// Use the TagSelector's Tag type for consistency
 type TagSelectorCompatibleTag = TagSelectorTag
+
+// Gender options for the user's own gender
+const GENDER_OPTIONS = [
+  { id: "male", label: "Male" },
+  { id: "female", label: "Female" },
+  { id: "non-binary", label: "Non-binary" },
+  { id: "prefer-not-to-say", label: "Prefer not to say" }
+]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -62,6 +71,8 @@ export default function SettingsPage() {
   // Form state
   const [formData, setFormData] = useState({
     nickname: "",
+    gender: "", // Added gender to form data
+    age: 18, // Added age to form data
     genderPreference: "no-preference",
     preferredAgeMin: 18,
     preferredAgeMax: 40,
@@ -99,6 +110,8 @@ export default function SettingsPage() {
         // Set form data
         setFormData({
           nickname: data.user.nickname || "",
+          gender: data.user.gender || "",
+          age: data.user.age || 18,
           genderPreference: data.user.genderPreference || "no-preference",
           preferredAgeMin: data.user.preferredAgeMin || 18,
           preferredAgeMax: data.user.preferredAgeMax || 40,
@@ -178,7 +191,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -189,6 +202,17 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
+      // Validate age
+      if (formData.age < 18 || formData.age > 100) {
+        toast({
+          title: "Error",
+          description: "Age must be between 18 and 100",
+          variant: "destructive",
+        })
+        setSaving(false)
+        return
+      }
+
       const allTagIds = [...interestTags, ...contextTags, ...intentionTags]
 
       const response = await fetch("/api/users/update", {
@@ -272,6 +296,36 @@ export default function SettingsPage() {
                 placeholder="How you'd like to be called"
                 className="premium-input"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gender</Label>
+              <RadioGroup
+                value={formData.gender}
+                onValueChange={(value) => handleInputChange("gender", value)}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                {GENDER_OPTIONS.map((option) => (
+                  <div key={option.id} className="flex items-center space-x-2">
+                    <RadioGroupItem value={option.id} id={`gender-${option.id}`} />
+                    <Label htmlFor={`gender-${option.id}`}>{option.label}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                min="18"
+                max="100"
+                value={formData.age}
+                onChange={(e) => handleInputChange("age", parseInt(e.target.value) || 18)}
+                className="premium-input"
+              />
+              <p className="text-xs text-muted-foreground">Must be between 18 and 100</p>
             </div>
           </CardContent>
         </Card>
