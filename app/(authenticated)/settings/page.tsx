@@ -53,7 +53,7 @@ const GENDER_OPTIONS = [
   { id: "male", label: "Male" },
   { id: "female", label: "Female" },
   { id: "non-binary", label: "Non-binary" },
-  { id: "prefer-not-to-say", label: "Prefer not to say" }
+  { id: "prefer-not-to-say", label: "Prefer not to say" },
 ]
 
 export default function SettingsPage() {
@@ -71,10 +71,10 @@ export default function SettingsPage() {
   // Form state
   const [formData, setFormData] = useState({
     nickname: "",
-    gender: "", // Added gender to form data
-    age: 18, // Added age to form data
+    gender: "",
+    age: 13, // Changed from 18 to 13
     genderPreference: "no-preference",
-    preferredAgeMin: 18,
+    preferredAgeMin: 13, // Changed from 18 to 13
     preferredAgeMax: 40,
     proximity: "local",
   })
@@ -111,9 +111,9 @@ export default function SettingsPage() {
         setFormData({
           nickname: data.user.nickname || "",
           gender: data.user.gender || "",
-          age: data.user.age || 18,
+          age: data.user.age || 13,
           genderPreference: data.user.genderPreference || "no-preference",
-          preferredAgeMin: data.user.preferredAgeMin || 18,
+          preferredAgeMin: data.user.preferredAgeMin || 13,
           preferredAgeMax: data.user.preferredAgeMax || 40,
           proximity: data.user.proximity || "local",
         })
@@ -203,10 +203,10 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       // Validate age
-      if (formData.age < 18 || formData.age > 100) {
+      if (formData.age < 13 || formData.age > 100) {
         toast({
           title: "Error",
-          description: "Age must be between 18 and 100",
+          description: "Age must be between 13 and 100",
           variant: "destructive",
         })
         setSaving(false)
@@ -319,13 +319,13 @@ export default function SettingsPage() {
               <Input
                 id="age"
                 type="number"
-                min="18"
+                min="13"
                 max="100"
                 value={formData.age}
-                onChange={(e) => handleInputChange("age", parseInt(e.target.value) || 18)}
+                onChange={(e) => handleInputChange("age", Number.parseInt(e.target.value) || 13)}
                 className="premium-input"
               />
-              <p className="text-xs text-muted-foreground">Must be between 18 and 100</p>
+              <p className="text-xs text-muted-foreground">Must be between 13 and 100</p>
             </div>
           </CardContent>
         </Card>
