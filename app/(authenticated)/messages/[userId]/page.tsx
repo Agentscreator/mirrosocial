@@ -508,7 +508,7 @@ const DMMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] relative z-10">
+    <div className="p-3 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] fixed md:relative bottom-0 left-0 right-0 z-[60] md:z-10">
       <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
         <div>
           <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
@@ -952,20 +952,24 @@ export default function DirectMessagePage() {
               
               .str-chat__message-list {
                 padding: 1rem;
+                padding-bottom: 120px !important; /* Account for fixed message input */
               }
               
-              .str-chat__message-input {
-                position: fixed !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                z-index: 50 !important;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
+              .str-chat__main-panel {
+                height: 100dvh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                padding-bottom: 0 !important;
               }
               
-              .str-chat__message-list {
-                padding-bottom: 80px !important;
+              .str-chat__channel {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+              }
+              
+              .str-chat__message-list-scroll {
+                padding-bottom: 120px !important;
               }
             }
 

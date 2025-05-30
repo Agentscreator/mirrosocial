@@ -258,7 +258,7 @@ const CustomMessageInput = () => {
   }, [text])
 
   return (
-    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] relative z-10">
+    <div className="p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t border-sky-100/50 pb-[env(safe-area-inset-bottom)] fixed md:relative bottom-0 left-0 right-0 z-[60] md:z-10">
       <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-4 min-h-[60px]">
         <Button
           type="button"
@@ -1175,6 +1175,16 @@ export default function MessagesPage() {
                 
                 .str-chat__message-list {
                   padding: 1rem;
+                  padding-bottom: 120px !important; /* Account for fixed message input */
+                }
+                
+                .str-chat__main-panel {
+                  height: 100dvh !important;
+                  padding-bottom: 0 !important;
+                }
+                
+                .str-chat__message-list-scroll {
+                  padding-bottom: 120px !important;
                 }
               }
             `,
